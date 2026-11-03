@@ -12,6 +12,8 @@ ue-mcp exposes two overlapping surfaces. Picking the right one per task avoids s
 
 This is **not** a blanket "always use epic" rule. Epic needs 5.8 + plugins, and much of ue-mcp has no epic equivalent or adds idempotency/rollback the raw tools lack.
 
+**Below UE 5.8 the server hides every `epic_*` action and the `epic` tool.** If they aren't in your tool list, use the native path for everything.
+
 ## The one that matters most: Blueprint graph bodies -> the DSL
 
 Authoring the **contents of a graph** (event graph, function body, macro) is the headline case.
@@ -29,9 +31,10 @@ Authoring the **contents of a graph** (event graph, function body, macro) is the
 | CDO / class defaults, tick settings | native `blueprint(set_class_default, set_actor_tick_settings)` |
 | Interfaces, event dispatchers | native `blueprint(create_interface, add_interface, add_event_dispatcher)` |
 | Structured compile / validate with diagnostics | native `blueprint(compile, validate)` |
+| Arrange a graph's nodes after authoring (either route) | native `blueprint(auto_layout)`, once at the end |
 | A task with no native action but an `epic_*` one exists | the `epic_*` action |
 | A task with no epic equivalent | the native action |
 
 ## Fallback
 
-If `epic(action="status")` reports the registry unavailable (pre-5.8, plugins off, or `available=false`), route **everything** through the native path - the DSL actions will not exist. The native node-by-node path (`add_node` -> `set_node_property` -> `connect_pins` -> `compile`) always works; see the `ue-mcp-blueprint` skill.
+If `epic(action="status")` reports the registry unavailable (pre-5.8, plugins off, or `available=false`), route **everything** through the native path - the DSL actions will not exist. The native node-by-node path (`add_node` -> `set_node_property` -> `connect_pins` -> `compile` -> `auto_layout`) always works; see the `ue-mcp-blueprint` skill.

@@ -6,10 +6,10 @@ name: Rust server
 on:
   push:
     branches: [rust-hub]
-    paths: ["rust/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "skills/**", ".github/workflows/rust.yml"]
     tags: ["rust-v*"]
   pull_request:
-    paths: ["rust/**", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "skills/**", ".github/workflows/rust.yml"]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,9 @@ jobs:
         run: cargo test --locked --release
       - name: Build
         run: cargo build --locked --release
+      - name: Skills cite only real actions
+        if: runner.os == 'Linux'
+        run: python3 tools/check_skill_actions.py target/release/ue-mcp-rs ../skills
       - name: Package
         run: |
           case "$RUNNER_OS" in

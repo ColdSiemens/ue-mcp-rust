@@ -49,6 +49,8 @@ git clone -b rust-hub https://github.com/ColdSiemens/ue-mcp-rust.git
 .\rust\install-plugin.ps1 -Project D:\Games\MyGame\MyGame.uproject
 ```
 
+It also copies the six `ue-mcp-*` agent skills (workflow, Blueprint, native C++, Epic routing, Niagara, animation) into the game's `.claude\skills\`. It replaces only those six folders, backs the old copies up to `Saved\`, and leaves your other skills alone. Pass `-SkipSkills` to install the plugin only.
+
 Then compile it for your engine:
 - **C++ project:** build the Editor target.
 - **Blueprint-only project:** open the project and accept the rebuild prompt.
@@ -117,7 +119,8 @@ Below 5.8, a few actions and options return "requires UE 5.8" instead of failing
 |---|---|
 | `rust/` | The Rust MCP server, its tests, install scripts and tools |
 | `plugin/ue_mcp_bridge/` | The editor plugin (upstream plus this fork's changes) |
-| `src/`, `docs/`, `skills/` | Upstream's Node server and docs, unchanged; [upstream README](docs/upstream-README.md) |
+| `skills/` | Agent skills for this server, installed into the game by `install-plugin.ps1` |
+| `src/`, `docs/` | Upstream's Node server and docs, unchanged; [upstream README](docs/upstream-README.md) |
 | `tests/ue_mcp/` | Upstream's UE 5.8 test project |
 
 ## Development
@@ -130,7 +133,8 @@ cargo test
 - `cargo test` runs unit and end-to-end tests against a simulated editor.
 - `python rust/tools/multi_agent_smoke.py --exe ... --project ... --start-editor` runs three agents against a real editor.
 - `rust\tools\check-engine-compat.ps1` compiles the plugin on every installed UE 5.5+.
-- CI builds and tests Windows and Linux on every push. A `rust-v*` tag publishes a release.
+- `python rust/tools/check_skill_actions.py <ue-mcp-rs.exe> skills` fails if a skill cites an action the server doesn't have.
+- CI builds and tests Windows and Linux on every push, and runs the skill check. A `rust-v*` tag publishes a release.
 
 ## License
 

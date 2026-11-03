@@ -24,6 +24,8 @@ The `niagara` tool covers systems, emitters, modules, renderers, and HLSL author
 
 ## Module inputs + static switches (v0.7.14)
 
+**UE 5.8 only:** `list_module_inputs`, `set_module_input` and `set_dynamic_input`. Below 5.8 they return "requires UE 5.8", because NiagaraEditor doesn't export the stack API there. Don't retry. Static switches and renderer properties work on every version.
+
 - `niagara(action="list_module_inputs", systemPath, emitterName?, emitterIndex?, stackContext?, moduleName?)` - lists each module's settable inputs (name, qualifiedName, type, settable flag). `inputs` are the override-map inputs; compile-time switches and enums come back separately under `switchPins`. **Current values are not returned**: NiagaraEditor does not export the reader, so only names and types are readable.
 - `niagara(action="set_module_input", systemPath, moduleName, inputName, value, emitterName?, emitterIndex?, stackContext?)` - writes through the stack override map when the input is bound there, otherwise the pin default, and reports which in `writePath`. **Limitation:** the override-map path cannot read the previous value, so it offers no rollback; set the value again to undo.
 - `niagara(action="list_static_switches", systemPath, moduleName?, emitterName?, stackContext?)` - uses `UNiagaraGraph::FindStaticSwitchInputs` on each module's function script, cross-referenced against pins on the calling node.

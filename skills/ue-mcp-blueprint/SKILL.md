@@ -16,7 +16,7 @@ When you are authoring the **contents of a graph** (event graph, function body, 
 
 The DSL authors and compiles an entire graph in a single round-trip, which is materially faster and more reliable than stitching individual K2Nodes together (one correct pass vs several failed iterations). Use it for graph bodies whenever it is available.
 
-**Availability / fallback.** The `epic_*` actions come from Epic's ToolsetRegistry and require **UE 5.8+ with the Epic toolset plugins enabled**. Check with `epic(action="status")`. When they are unavailable (pre-5.8, or the registry is off), fall back to the native node path below.
+**Availability / fallback.** The `epic_*` actions come from Epic's ToolsetRegistry and require **UE 5.8+ with the Epic toolset plugins enabled**. On an older editor the server hides them, along with the `epic` tool, so if you don't see them, you can't use them. Otherwise check with `epic(action="status")`. When they are unavailable, use the native node path below.
 
 **Keep using the native actions for** read/discovery, SCS components, CDO/class defaults, interfaces + event dispatchers, structured `compile`/`validate`, and anything with no Epic equivalent - the native path adds idempotency and rollback the raw tools lack. See the `ue-mcp-epic-routing` skill for the full epic-vs-native decision.
 
@@ -33,10 +33,27 @@ For any existing Blueprint:
 
 ## Mutation recipe
 
+0. **Lock it** when other agents share the editor - `asset(action="lock", args={assetPath})`, and `unlock` when done.
 1. **Create the skeleton** - `blueprint(action="create", assetPath, parentClass?)`.
 2. **Add variables + components** - `add_variable`, `add_component` (pass `parentComponent` for SCS hierarchy).
-3. **Build graphs** - `add_node` each K2Node, `set_node_property` for pin defaults, `connect_pins` to wire exec + data.
+3. **Build graphs** - `add_node` each K2Node, `set_node_property` for pin defaults, `connect_pins` to wire exec + data. Pass `deferCompile: true` on each, so the Blueprint compiles once at the end rather than after every write.
 4. **Compile** - `blueprint(action="compile", assetPath)`. Compilation errors come back in the result; fix them before proceeding.
+5. **Lay it out** - `blueprint(action="auto_layout", args={assetPath})` (see below).
+
+## Node positions: don't place them, lay out once
+
+Don't spend effort working out node positions. `add_node` stacks new nodes, and that's fine: wire everything, then call `blueprint(action="auto_layout", args={assetPath})` once. It arranges the graphs you added nodes to into readable rows:
+- one row per event or function entry;
+- exec wires straight;
+- the pure nodes feeding a node tucked under the wire just before it;
+- Branch False / Cast Failed / loop Completed paths on sub-rows below.
+
+Other options:
+- `graphName`, `graphs` or `all: true` choose the graphs;
+- `dryRun: true` only reports;
+- `save: true` saves.
+
+It never compiles. Every run writes a report with each node's old position, and `blueprint(action="restore_layout", args={report})` puts the graph back; on this fork's plugin one Ctrl+Z also undoes it. Don't run it on a graph a person arranged by hand unless they ask.
 
 ## Node wiring fundamentals
 
