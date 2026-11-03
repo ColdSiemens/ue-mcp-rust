@@ -17,19 +17,16 @@ permissions:
 
 jobs:
   build:
+    # Hosted macOS arm64 runners are often short of capacity, and a queued job
+    # can be cancelled without ever starting, which fails the whole run. So
+    # ordinary pushes test Windows and Linux; release tags also try macOS, and
+    # that job may fail without failing the run or blocking the release.
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            exe: ue-mcp-rs.exe
-            archive: ue-mcp-rs-windows-x64.zip
-          - os: macos-latest
-            exe: ue-mcp-rs
-            archive: ue-mcp-rs-macos-arm64.tar.gz
-          - os: ubuntu-latest
-            exe: ue-mcp-rs
-            archive: ue-mcp-rs-linux-x64.tar.gz
+        os: ${{ fromJSON(startsWith(github.ref, 'refs/tags/rust-v') && '["windows-latest","ubuntu-latest","macos-latest"]' || '["windows-latest","ubuntu-latest"]') }}
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -45,17 +42,24 @@ jobs:
         run: cargo build --locked --release
       - name: Package
         run: |
+          case "$RUNNER_OS" in
+            Windows) exe=ue-mcp-rs.exe; archive=ue-mcp-rs-windows-x64.zip ;;
+            macOS)   exe=ue-mcp-rs;     archive=ue-mcp-rs-macos-arm64.tar.gz ;;
+            *)       exe=ue-mcp-rs;     archive=ue-mcp-rs-linux-x64.tar.gz ;;
+          esac
           mkdir dist
-          cp "target/release/${{ matrix.exe }}" README.md ../LICENSE dist/
+          cp "target/release/$exe" README.md ../LICENSE dist/
           cd dist
-          if [[ "${{ matrix.archive }}" == *.zip ]]; then 7z a "../${{ matrix.archive }}" ./*; else tar czf "../${{ matrix.archive }}" ./*; fi
+          if [[ "$archive" == *.zip ]]; then 7z a "../$archive" ./*; else tar czf "../$archive" ./*; fi
+          echo "ARCHIVE=$archive" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.archive }}
-          path: rust/${{ matrix.archive }}
+          name: ${{ env.ARCHIVE }}
+          path: rust/${{ env.ARCHIVE }}
 
   release:
-    if: startsWith(github.ref, 'refs/tags/rust-v')
+    # !cancelled() lets the release go out when only the optional macOS build is missing.
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/rust-v') }}
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -63,6 +67,8 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      - name: Require the Windows and Linux builds
+        run: ls -l artifacts && test -f artifacts/ue-mcp-rs-windows-x64.zip && test -f artifacts/ue-mcp-rs-linux-x64.tar.gz
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
