@@ -68,6 +68,8 @@ if (-not $SkipSkills) {
 }
 
 $association = (Get-Content $uproject.FullName -Raw | ConvertFrom-Json).EngineAssociation
+# A project inside a source-built engine's tree has no association.
+if (-not $association) { $association = 'the source build it sits in' }
 Write-Host ""
 Write-Host "Next: compile it for this project's engine ($association)."
 if (Test-Path (Join-Path $projectDir 'Source')) {
