@@ -51,6 +51,33 @@ const SIGNATURE_OVERRIDES: &[(&str, &str, &str)] = &[(
     "execute_python(code, captureLog?:b, maxLogChars?:n, resultVariable?) - last resort: prefer a dedicated action",
 )];
 
+/// Actions the hub defines itself: they replace a recorded action of the same
+/// name or are added to the tool. (tool, action, effect, signature, summary)
+const HUB_DEFINED: &[(&str, &str, Effect, &str, &str)] = &[
+    (
+        "blueprint",
+        "auto_layout",
+        Effect::Mutate,
+        "auto_layout(assetPath|path, graphName?, graphs?:[s], all?:b, dryRun?:b, save?:b, force?:b) - tidy a graph in one call; don't position nodes yourself",
+        "Lay a Blueprint graph out in readable rows: one row per event or function entry, exec nodes on one straight line, \
+         the pure nodes feeding a node tucked under the wire just before it, extra exec outputs (Branch False, Cast Failed, \
+         loop Completed) on sub-rows below. Add nodes anywhere (add_node leaves them stacked) and call this once at the end \
+         instead of computing positions. With no graph named it lays out the graphs you added nodes to, else EventGraph; \
+         all:true lays out every graph with nodes. Moves positions only: nothing is compiled; save:true saves the asset. \
+         Refused while Play In Editor runs. Writes Saved/BPLayout/<Asset>.<Graph>.layout.json (every node's old and new \
+         position) and an SVG sketch; restore_layout with that report puts the graph back, and on this fork's plugin one \
+         Ctrl+Z does too. dryRun:true computes and reports without moving.",
+    ),
+    (
+        "blueprint",
+        "restore_layout",
+        Effect::Mutate,
+        "restore_layout(report, save?:b, force?:b)",
+        "Put a graph back exactly as it was before an auto_layout run, from the .layout.json report that run returned \
+         (an absolute path, or a file name in Saved/BPLayout).",
+    ),
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Effect {
     Read,
@@ -203,6 +230,22 @@ impl Surface {
                     timeout_ms: spec["timeoutMs"].as_u64(),
                     follow_up: spec["followUp"].as_bool().unwrap_or(false),
                 });
+            }
+            for &(tool, aname, effect, signature, summary) in HUB_DEFINED.iter().filter(|d| d.0 == name) {
+                let defined = Action {
+                    name: aname.to_string(),
+                    dispatch: Dispatch::Local,
+                    effect,
+                    summary: Some(summary.to_string()),
+                    signature: Some(signature.to_string()),
+                    timeout_ms: None,
+                    follow_up: false,
+                };
+                debug_assert_eq!(tool, name);
+                match actions.iter_mut().find(|a| a.name == aname) {
+                    Some(existing) => *existing = defined,
+                    None => actions.push(defined),
+                }
             }
             let index = actions.iter().enumerate().map(|(i, a)| (a.name.clone(), i)).collect();
             let mut schema_extra = t["inputSchema"]["properties"].as_object().cloned().unwrap_or_default();
@@ -464,5 +507,15 @@ mod tests {
         let mut names: Vec<String> = s.list(&view).iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
         names.sort();
         assert_eq!(names, vec!["level", "project"]);
+    }
+
+    #[test]
+    fn hub_defined_actions_replace_and_add() {
+        let s = Surface::load();
+        let bp = s.tool("blueprint").unwrap();
+        let layout = bp.action("auto_layout").unwrap();
+        assert!(matches!(layout.dispatch, Dispatch::Local), "replaces the plugin's column grid");
+        assert!(layout.signature.as_deref().unwrap().starts_with("auto_layout(assetPath"));
+        assert!(matches!(bp.action("restore_layout").unwrap().dispatch, Dispatch::Local));
     }
 }

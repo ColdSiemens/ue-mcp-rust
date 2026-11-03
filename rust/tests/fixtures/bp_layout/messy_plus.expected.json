@@ -1,0 +1,481 @@
+{
+ "pos": {
+  "K2Node_Event_10": {
+   "x": 0,
+   "y": 0
+  },
+  "K2Node_CustomEvent_10": {
+   "x": 0,
+   "y": 385
+  },
+  "K2Node_VariableSet_10": {
+   "x": 225,
+   "y": 430
+  },
+  "K2Node_IfThenElse_10": {
+   "x": 860,
+   "y": 430
+  },
+  "K2Node_CallFunction_21": {
+   "x": 619,
+   "y": 495
+  },
+  "K2Node_VariableGet_10": {
+   "x": 484,
+   "y": 495
+  },
+  "K2Node_CallFunction_20": {
+   "x": 1111,
+   "y": 430
+  },
+  "K2Node_CallFunction_22": {
+   "x": 1111,
+   "y": 593
+  },
+  "K2Node_CallFunction_23": {
+   "x": 1456,
+   "y": 430
+  },
+  "K2Node_Event_0": {
+   "x": 0,
+   "y": 972
+  },
+  "K2Node_Event_3": {
+   "x": 0,
+   "y": 1327
+  },
+  "K2Node_ExecutionSequence_0": {
+   "x": 262,
+   "y": 1358
+  },
+  "K2Node_CallFunction_0": {
+   "x": 463,
+   "y": 1358
+  },
+  "K2Node_CallFunction_3": {
+   "x": 463,
+   "y": 1521
+  },
+  "K2Node_CallFunction_1": {
+   "x": 1042,
+   "y": 1521
+  },
+  "K2Node_CallFunction_6": {
+   "x": 867,
+   "y": 1585
+  },
+  "K2Node_VariableGet_1": {
+   "x": 732,
+   "y": 1586
+  },
+  "K2Node_Event_4": {
+   "x": 0,
+   "y": 1897
+  },
+  "K2Node_IfThenElse_0": {
+   "x": 588,
+   "y": 1927
+  },
+  "K2Node_CallFunction_4": {
+   "x": 353,
+   "y": 1992
+  },
+  "K2Node_VariableGet_0": {
+   "x": 226,
+   "y": 1992
+  },
+  "K2Node_VariableSet_0": {
+   "x": 839,
+   "y": 1927
+  },
+  "K2Node_CallFunction_2": {
+   "x": 839,
+   "y": 2066
+  },
+  "K2Node_Event_1": {
+   "x": 0,
+   "y": 2445
+  },
+  "K2Node_Event_2": {
+   "x": 0,
+   "y": 2830
+  },
+  "K2Node_CustomEvent_0": {
+   "x": 0,
+   "y": 3215
+  },
+  "K2Node_VariableSet_1": {
+   "x": 454,
+   "y": 3260
+  },
+  "K2Node_CallFunction_5": {
+   "x": 225,
+   "y": 3325
+  },
+  "K2Node_CustomEvent_11": {
+   "x": 0,
+   "y": 3642
+  },
+  "K2Node_CallFunction_40": {
+   "x": 225,
+   "y": 3687
+  },
+  "K2Node_CallFunction_41": {
+   "x": 505,
+   "y": 3687
+  },
+  "K2Node_InputAction_0": {
+   "x": 0,
+   "y": 4080
+  },
+  "K2Node_Knot_0": {
+   "x": 262,
+   "y": 4113
+  },
+  "K2Node_CallFunction_24": {
+   "x": 707,
+   "y": 4066
+  },
+  "K2Node_CallFunction_25": {
+   "x": 374,
+   "y": 4145
+  },
+  "K2Node_CallFunction_26": {
+   "x": 354,
+   "y": 4254
+  },
+  "K2Node_Knot_1": {
+   "x": 262,
+   "y": 4333
+  },
+  "K2Node_CallFunction_30": {
+   "x": 0,
+   "y": 4623
+  },
+  "K2Node_CallFunction_31": {
+   "x": 284,
+   "y": 4623
+  },
+  "K2Node_ExecutionSequence_10": {
+   "x": 0,
+   "y": 4827
+  },
+  "K2Node_CallFunction_32": {
+   "x": 204,
+   "y": 4827
+  },
+  "K2Node_CallFunction_33": {
+   "x": 506,
+   "y": 4926
+  },
+  "K2Node_CallFunction_34": {
+   "x": 331,
+   "y": 4990
+  },
+  "K2Node_VariableGet_11": {
+   "x": 204,
+   "y": 4991
+  },
+  "K2Node_VariableGet_12": {
+   "x": 0,
+   "y": 5302
+  },
+  "K2Node_VariableGet_13": {
+   "x": 133,
+   "y": 5302
+  },
+  "K2Node_CallFunction_35": {
+   "x": 259,
+   "y": 5302
+  },
+  "EdGraphNode_Comment_0": {
+   "x": 0,
+   "y": 5618.5
+  },
+  "EdGraphNode_Comment_1": {
+   "x": 720,
+   "y": 5618.5
+  }
+ },
+ "size": {
+  "K2Node_Event_0": {
+   "w": 181,
+   "h": 95
+  },
+  "K2Node_Event_1": {
+   "w": 236,
+   "h": 125
+  },
+  "K2Node_Event_2": {
+   "w": 154,
+   "h": 125
+  },
+  "K2Node_Event_3": {
+   "w": 192,
+   "h": 95
+  },
+  "K2Node_Event_4": {
+   "w": 156,
+   "h": 95
+  },
+  "K2Node_CustomEvent_0": {
+   "w": 155,
+   "h": 109
+  },
+  "K2Node_ExecutionSequence_0": {
+   "w": 131,
+   "h": 97
+  },
+  "K2Node_CallFunction_0": {
+   "w": 208,
+   "h": 119
+  },
+  "K2Node_CallFunction_1": {
+   "w": 143,
+   "h": 116
+  },
+  "K2Node_CallFunction_2": {
+   "w": 208,
+   "h": 119
+  },
+  "K2Node_CallFunction_3": {
+   "w": 199,
+   "h": 98
+  },
+  "K2Node_IfThenElse_0": {
+   "w": 181,
+   "h": 97
+  },
+  "K2Node_VariableGet_0": {
+   "w": 87,
+   "h": 32
+  },
+  "K2Node_CallFunction_4": {
+   "w": 185,
+   "h": 57
+  },
+  "K2Node_VariableSet_0": {
+   "w": 167,
+   "h": 95
+  },
+  "K2Node_VariableGet_1": {
+   "w": 95,
+   "h": 32
+  },
+  "K2Node_CallFunction_5": {
+   "w": 179,
+   "h": 57
+  },
+  "K2Node_VariableSet_1": {
+   "w": 141,
+   "h": 95
+  },
+  "K2Node_CallFunction_6": {
+   "w": 125,
+   "h": 33
+  },
+  "K2Node_Event_10": {
+   "w": 154,
+   "h": 125
+  },
+  "K2Node_CustomEvent_10": {
+   "w": 155,
+   "h": 109
+  },
+  "K2Node_VariableSet_10": {
+   "w": 189,
+   "h": 98
+  },
+  "K2Node_IfThenElse_10": {
+   "w": 181,
+   "h": 97
+  },
+  "K2Node_CallFunction_21": {
+   "w": 191,
+   "h": 57
+  },
+  "K2Node_VariableGet_10": {
+   "w": 95,
+   "h": 32
+  },
+  "K2Node_CallFunction_20": {
+   "w": 275,
+   "h": 119
+  },
+  "K2Node_CallFunction_22": {
+   "w": 217,
+   "h": 119
+  },
+  "K2Node_CallFunction_23": {
+   "w": 213,
+   "h": 119
+  },
+  "K2Node_InputAction_0": {
+   "w": 192,
+   "h": 128
+  },
+  "K2Node_Knot_0": {
+   "w": 42,
+   "h": 24
+  },
+  "K2Node_Knot_1": {
+   "w": 42,
+   "h": 24
+  },
+  "K2Node_CallFunction_24": {
+   "w": 156,
+   "h": 109
+  },
+  "K2Node_CallFunction_26": {
+   "w": 156,
+   "h": 109
+  },
+  "K2Node_CallFunction_25": {
+   "w": 283,
+   "h": 65
+  },
+  "K2Node_CallFunction_30": {
+   "w": 214,
+   "h": 119
+  },
+  "K2Node_CallFunction_31": {
+   "w": 199,
+   "h": 98
+  },
+  "K2Node_ExecutionSequence_10": {
+   "w": 134,
+   "h": 97
+  },
+  "K2Node_CallFunction_32": {
+   "w": 200,
+   "h": 119
+  },
+  "K2Node_CallFunction_33": {
+   "w": 143,
+   "h": 116
+  },
+  "K2Node_CallFunction_34": {
+   "w": 125,
+   "h": 33
+  },
+  "K2Node_VariableGet_11": {
+   "w": 87,
+   "h": 32
+  },
+  "K2Node_VariableGet_12": {
+   "w": 93,
+   "h": 32
+  },
+  "K2Node_VariableGet_13": {
+   "w": 86,
+   "h": 32
+  },
+  "K2Node_CallFunction_35": {
+   "w": 185,
+   "h": 57
+  },
+  "K2Node_CustomEvent_11": {
+   "w": 155,
+   "h": 109
+  },
+  "K2Node_CallFunction_40": {
+   "w": 210,
+   "h": 119
+  },
+  "K2Node_CallFunction_41": {
+   "w": 199,
+   "h": 98
+  }
+ },
+ "rows": [
+  {
+   "root": "K2Node_Event_10",
+   "top": 0,
+   "bottom": 125,
+   "right": 154
+  },
+  {
+   "root": "K2Node_CustomEvent_10",
+   "top": 385,
+   "bottom": 712,
+   "right": 1669
+  },
+  {
+   "root": "K2Node_Event_0",
+   "top": 972,
+   "bottom": 1067,
+   "right": 181
+  },
+  {
+   "root": "K2Node_Event_3",
+   "top": 1327,
+   "bottom": 1637,
+   "right": 1185
+  },
+  {
+   "root": "K2Node_Event_4",
+   "top": 1897,
+   "bottom": 2185,
+   "right": 1047
+  },
+  {
+   "root": "K2Node_Event_1",
+   "top": 2445,
+   "bottom": 2570,
+   "right": 236
+  },
+  {
+   "root": "K2Node_Event_2",
+   "top": 2830,
+   "bottom": 2955,
+   "right": 154
+  },
+  {
+   "root": "K2Node_CustomEvent_0",
+   "top": 3215,
+   "bottom": 3382,
+   "right": 595
+  },
+  {
+   "root": "K2Node_CustomEvent_11",
+   "top": 3642,
+   "bottom": 3806,
+   "right": 704
+  },
+  {
+   "root": "K2Node_InputAction_0",
+   "top": 4066,
+   "bottom": 4363,
+   "right": 863
+  },
+  {
+   "root": "__leftover",
+   "top": 4623,
+   "bottom": 5042,
+   "right": 649
+  },
+  {
+   "root": "__loose",
+   "top": 5302,
+   "bottom": 5359,
+   "right": 444
+  }
+ ],
+ "warnings": [
+  "5 exec node(s) no event reaches were put in a row of their own",
+  "3 unconnected pure node(s) were lined up in the last row: Get Unused, Get Speed, float × float",
+  "2 comment box(es) were moved below the rows; re-wrap them by hand"
+ ],
+ "order": [
+  "K2Node_Event_10",
+  "K2Node_CustomEvent_10",
+  "K2Node_Event_0",
+  "K2Node_Event_3",
+  "K2Node_Event_4",
+  "K2Node_Event_1",
+  "K2Node_Event_2",
+  "K2Node_CustomEvent_0",
+  "K2Node_CustomEvent_11",
+  "K2Node_InputAction_0"
+ ]
+}

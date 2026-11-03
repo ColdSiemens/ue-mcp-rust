@@ -116,6 +116,7 @@ private:
 	static TSharedPtr<FJsonValue> CleanupGraph(const TSharedPtr<FJsonObject>& Params);
 	static TSharedPtr<FJsonValue> ConnectPinsBatch(const TSharedPtr<FJsonObject>& Params);
 	static TSharedPtr<FJsonValue> SetNodePosition(const TSharedPtr<FJsonObject>& Params);
+	static TSharedPtr<FJsonValue> SetNodePositions(const TSharedPtr<FJsonObject>& Params);
 	static TSharedPtr<FJsonValue> AutoLayoutGraph(const TSharedPtr<FJsonObject>& Params);
 	// #945: project-wide search for authored function call sites, narrowed by
 	// the Asset Registry before any package is loaded. Defined in

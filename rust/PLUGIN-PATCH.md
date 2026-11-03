@@ -1,13 +1,14 @@
 # UE_MCP_Bridge changes in this fork
 
-This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1) plus three changes:
+This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1) plus four changes:
 1. Concurrent requests per socket.
 2. No background throttling while a client is connected.
 3. Builds on UE 5.5.4.
+4. A batch node-move handler for Blueprint layout.
 
 Status:
 - Compiled on UE 5.8.2 and UE 5.5.4. `rust/tools/check-engine-compat.ps1` repeats the check.
-- Live-tested on UE 5.8.2: start, reads, one-socket concurrency, parallel reads and stop all passed, and the editor log shows throttling suspended.
+- Live-tested on UE 5.8.2 and 5.5.4: start, reads, one-socket concurrency, parallel reads, stop, and Blueprint layout with undo all passed. The editor log shows throttling suspended.
 
 ## What changes
 
@@ -50,6 +51,15 @@ What is missing below UE 5.8 (verified absent in 5.5.4; may exist in 5.6/5.7):
 | `epic_*` actions | Need UE 5.8's toolset registry; the Rust server hides them on older editors. |
 | Output fields | Omitted where 5.5 has no data: StateTree schema flags and `tasksCompletion`, `description` (needs 5.6), `numExternalObjects`, plugin `mounted`, trace bytes emitted. Relay trace states read "unknown"; sound concurrency reports the authored `MaxCount`. |
 | Widget variable GUIDs | Not synced, because 5.5 widget blueprints have no GUID map. |
+
+**4. `set_node_positions`** (`BlueprintHandlers_Graph.cpp`)
+
+This moves many nodes of one graph in a single game-thread call: `{assetPath, graphName?, positions: [{nodeId, posX, posY}]}`.
+- **Before:** layout tools could only call `set_node_position` once per node. Each call cost a round trip, and an open graph view redrew every time (~0.45 s per node, 134 s for 300 nodes). Nothing could be undone.
+- **Undo:** all moves run in one `FScopedTransaction`, with `Modify()` before each write, so a single Ctrl+Z restores the graph.
+- **Refresh:** the graph is notified once.
+- **Result:** it reports `moved`, `unchanged`, and the node IDs it couldn't find.
+- **Who uses it:** the Rust server's `blueprint(auto_layout)` calls it when the plugin registers it.
 
 ## Opt-outs
 

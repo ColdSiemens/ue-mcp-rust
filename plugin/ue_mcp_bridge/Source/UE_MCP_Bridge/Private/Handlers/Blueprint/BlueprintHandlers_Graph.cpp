@@ -46,6 +46,7 @@
 #include "UObject/UnrealType.h"
 #include "UObject/Package.h"
 #include "UObject/TopLevelAssetPath.h"
+#include "ScopedTransaction.h"
 #include "Editor.h"
 #include "EditorAssetLibrary.h"
 #include "Containers/Queue.h"
@@ -3145,6 +3146,77 @@ TSharedPtr<FJsonValue> FBlueprintHandlers::SetNodePosition(const TSharedPtr<FJso
 		Payload->SetNumberField(TEXT("posY"), PrevPosY);
 		MCPSetRollback(Result, TEXT("set_node_position"), Payload);
 	}
+	return MCPResult(Result);
+}
+
+// set_node_positions: move many nodes of one graph in a single game-thread call.
+// One transaction, so a single Ctrl+Z puts the graph back; one graph refresh,
+// where set_node_position redraws an open graph view per node.
+TSharedPtr<FJsonValue> FBlueprintHandlers::SetNodePositions(const TSharedPtr<FJsonObject>& Params)
+{
+	FString AssetPath;
+	if (auto Err = RequireString(Params, TEXT("assetPath"), AssetPath)) return Err;
+	const FString GraphName = OptionalString(Params, TEXT("graphName"), TEXT("EventGraph"));
+	const TArray<TSharedPtr<FJsonValue>>* Positions = nullptr;
+	if (auto Err = RequireArray(Params, TEXT("positions"), Positions)) return Err;
+
+	UBlueprint* Blueprint = LoadBlueprint(AssetPath);
+	if (!Blueprint) return BlueprintNotFoundError(AssetPath);
+	UEdGraph* Graph = FindGraph(Blueprint, GraphName);
+	if (!Graph) return MCPError(FString::Printf(TEXT("Graph not found: %s"), *GraphName));
+
+	// Modify() runs before each write: the transaction records the state an
+	// object has when Modify is called, and that is what Ctrl+Z restores.
+	FScopedTransaction Transaction(NSLOCTEXT("UEMCPBridge", "SetNodePositions", "Arrange Blueprint nodes"));
+	int32 Moved = 0;
+	int32 Unchanged = 0;
+	int32 Missing = 0;
+	TArray<TSharedPtr<FJsonValue>> NotFound;
+	for (const TSharedPtr<FJsonValue>& Entry : *Positions)
+	{
+		const TSharedPtr<FJsonObject>* Item = nullptr;
+		FString NodeId;
+		if (!Entry.IsValid() || !Entry->TryGetObject(Item) || !Item || !(*Item)->TryGetStringField(TEXT("nodeId"), NodeId))
+		{
+			continue;
+		}
+		UEdGraphNode* Node = FindNodeByGuidOrName(Graph, NodeId);
+		if (!Node)
+		{
+			// Capped: a stale report could name hundreds of nodes.
+			if (Missing++ < 50) NotFound.Add(MakeShared<FJsonValueString>(NodeId));
+			continue;
+		}
+		const int32 PosX = OptionalInt(*Item, TEXT("posX"), Node->NodePosX);
+		const int32 PosY = OptionalInt(*Item, TEXT("posY"), Node->NodePosY);
+		if (PosX == Node->NodePosX && PosY == Node->NodePosY)
+		{
+			Unchanged++;
+			continue;
+		}
+		Node->Modify();
+		Node->NodePosX = PosX;
+		Node->NodePosY = PosY;
+		Moved++;
+	}
+	if (Moved > 0)
+	{
+		Graph->NotifyGraphChanged();
+	}
+	else
+	{
+		Transaction.Cancel();
+	}
+
+	auto Result = MCPSuccess();
+	if (Moved > 0) MCPSetUpdated(Result); else MCPSetExisted(Result);
+	Result->SetStringField(TEXT("path"), AssetPath);
+	Result->SetStringField(TEXT("graphName"), GraphName);
+	Result->SetNumberField(TEXT("moved"), Moved);
+	Result->SetNumberField(TEXT("unchanged"), Unchanged);
+	Result->SetNumberField(TEXT("notFoundCount"), Missing);
+	Result->SetArrayField(TEXT("notFound"), NotFound);
+	Result->SetBoolField(TEXT("undoable"), Moved > 0);
 	return MCPResult(Result);
 }
 

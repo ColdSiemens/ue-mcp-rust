@@ -58,12 +58,36 @@ Tool-list size, as measured:
   - `editor`: `get_engine_state`, `execute_python` (ungated), `play_in_editor_ignore_blueprint_errors`
   - `project`: `get_status`, `get_info`, `describe_action`, `list_available_actions`, `search_tools`, `read_config`, `search_config`, `list_config_tags`, `build`
   - `editor`: `start_editor` (launches detached, waits for the bridge to report ready), `stop_editor` (the editor quits itself and raises its own save prompt), `restart_editor`, `request_editor_shutdown`, `build_project` (UnrealBuildTool, refused while the editor runs)
+- **New in this fork:** `blueprint(auto_layout)` and `blueprint(restore_layout)`. See below.
 - **Not ported** (removed from the advertised surface; the Node server still has them):
   - checkpoints
   - flows and feedback
   - npm plugin introspection
   - multi-editor routing
   - C++ source, config and engine-index tools (agents have their own file and shell tools for these)
+
+## Blueprint graph layout
+
+Agents building Blueprints either leave a heap of nodes or spend tokens working out positions as they go. Here they don't position nodes at all: they add and wire nodes anywhere, then call `blueprint(action="auto_layout", args={assetPath})` once. The server instructions say so.
+
+The layout is a port of the bp-graph-layout skill's row layout:
+- one row per event or function entry;
+- exec nodes on one straight line;
+- the pure nodes feeding a node tucked under the wire just before it;
+- extra exec outputs (Branch False, Cast Failed, loop Completed) on sub-rows below;
+- merges placed right of their last source.
+
+Parity tests check the Rust port against the original JS output on captured graphs.
+
+- **Which graphs.** With no graph named, it lays out the graphs this agent added nodes to (`add_node`, `import_nodes_t3d`, `connect_pins`), else `EventGraph`. `graphName`, `graphs` or `all:true` choose explicitly. `dryRun:true` computes without moving.
+- **What it does.** It moves positions only and compiles nothing; `save:true` saves the asset. It is refused while Play In Editor runs, and it honours other agents' locks.
+- **Moves and undo.** This fork's plugin moves the whole graph in one call (`set_node_positions`), as one undo step. With a stock plugin it falls back to one call per node, with no undo. Measured with 19 nodes and the graph open: 0.10 s against 0.66 s per node on 5.8, 0.13 s against 0.91 s on 5.5.4.
+- **Reports.** Every run writes `Saved/BPLayout/<Asset>.<Graph>.layout.json` (every node's old and new position) and an SVG sketch. `blueprint(action="restore_layout", args={report})` puts the graph back exactly; one Ctrl+Z also does.
+- **Limits** (from the original):
+  - node sizes are estimated from UE's default style;
+  - comment boxes are parked below the rows rather than re-wrapped;
+  - a node fed from several events' rows can leave a long backward wire;
+  - K2 graphs only, unless `force:true`.
 
 ## Engine versions
 

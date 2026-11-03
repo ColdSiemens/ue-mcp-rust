@@ -24,6 +24,8 @@ Working alongside other agents:
 - A timed-out mutation may still have landed: read before retrying.
 - Optional routing args: timeoutMs (raise the wait for long operations), select / omit (trim result fields).
 
+Blueprint graphs: don't spend effort on node positions. Add nodes anywhere (add_node leaves them stacked), wire them, then call blueprint(action=\"auto_layout\", args={assetPath}) once: it lays out the graphs you added nodes to in readable rows, and restore_layout undoes it.
+
 Editor lifecycle: editor(start_editor) launches the editor and waits until it is ready; editor(stop_editor) asks it to quit (it raises its own save prompt); editor(build_project) compiles C++ with the editor closed, project(live_coding_compile) with it open.
 Not available in this hub: checkpoints, flows, C++ source and engine-index tools. Use your own file and shell tools for source code.";
 

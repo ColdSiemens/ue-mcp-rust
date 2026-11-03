@@ -1,0 +1,2331 @@
+{
+ "success": true,
+ "path": "/Game/UI/WBP_Mix",
+ "graphName": "EventGraph",
+ "nodes": [
+  {
+   "id": "CE9B687239A4215E5A4A13BA59648099",
+   "class": "K2Node_Event",
+   "title": "Event Pre Construct",
+   "posX": 12,
+   "posY": 64,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "IsDesignTime",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "false",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "4571B6612A8AEAE12561868A0740A340",
+   "class": "K2Node_VariableGet",
+   "title": "Get TitleText",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "TitleText",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "FC86D9E4EFE462192ADD8ED1CCA3F5EF",
+   "class": "K2Node_CallFunction",
+   "title": "Set Visibility\nTarget is Widget",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "InVisibility",
+     "type": "byte",
+     "direction": "Input",
+     "defaultValue": "HitTestInvisible",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "8124E4627DA62EE7141A57D9A4EC66EC",
+   "class": "K2Node_CallFunction",
+   "title": "Set Text\nTarget is Text Block",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "InText",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "65CBC57354129F6588402BC98852BA15",
+   "class": "K2Node_CallFunction",
+   "title": "Set Color and Opacity\nTarget is Text Block",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "InColorAndOpacity",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(SpecifiedColor=(R=1.000000,G=1.000000,B=1.000000,A=1.000000),ColorUseRule=UseColor_Specified)",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "5C4A7D5E55F6BBE0D86B8B4130992800",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "This is a deliberately long default string value, (with \"quotes\"), that clamps the editor width",
+     "connected": false
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "FAF0F026F4EAB7C29811EB6B13F9FF23",
+   "class": "K2Node_Event",
+   "title": "Event Construct",
+   "posX": 0,
+   "posY": 16,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "77DD276CD2952C2020E0B8F8BE40F45D",
+   "class": "K2Node_ExecutionSequence",
+   "title": "Sequence",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then_0",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then_1",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then_2",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "2675B4A7C1F2D0C7D2E8B08A610C9F08",
+   "class": "K2Node_MacroInstance",
+   "title": "For Each Loop",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Exec",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Array",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "LoopBody",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Array Element",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Array Index",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Completed",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "A0BB0465F850B1D2EA13F338015358A6",
+   "class": "K2Node_VariableGet",
+   "title": "Get Items",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Items",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6E7FB33D89660206D69A315E49DC2867",
+   "class": "K2Node_VariableGet",
+   "title": "Get ItemList",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "ItemList",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6657A4992E9CAA991FC5EC7BCC03E4CF",
+   "class": "K2Node_CallFunction",
+   "title": "Add Child\nTarget is Panel Widget",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Content",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "ReturnValue",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6B099BB475E1E4946780E82D641D4EE3",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "849FAADFBABA72A16DCF028FE7822D0A",
+   "class": "K2Node_FormatText",
+   "title": "Format Text",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Format",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Count",
+     "type": "wildcard",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Name",
+     "type": "wildcard",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Result",
+     "type": "text",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "62AE38AEDA12CF37EAB63B5623FF85F0",
+   "class": "K2Node_CallArrayFunction",
+   "title": "LENGTH",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "TargetArray",
+     "type": "wildcard",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "ReturnValue",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "003595387034FFC49562DFE48F8596DF",
+   "class": "K2Node_VariableGet",
+   "title": "Get PlayerName",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "PlayerName",
+     "type": "string",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "30A56B84450128B2CA2001CCA0D22897",
+   "class": "K2Node_CallFunction",
+   "title": "To String (Text)",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InText",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "ReturnValue",
+     "type": "string",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "13E6076A816F05F7745AF01DCBCE91C1",
+   "class": "K2Node_IfThenElse",
+   "title": "Branch",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Condition",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "else",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "671E43C73157448252E934C15FA94684",
+   "class": "K2Node_CommutativeAssociativeBinaryOperator",
+   "title": "AND",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "A",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": true
+    },
+    {
+     "name": "B",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": true
+    },
+    {
+     "name": "C",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "ReturnValue",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "B4FF6787128E444C86E0C586B4216CD1",
+   "class": "K2Node_VariableGet",
+   "title": "Get bIsLocked",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "bIsLocked",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "340AADFAAC96E79C5FBB62200AAAE1AD",
+   "class": "K2Node_VariableGet",
+   "title": "Get bHasItems",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "bHasItems",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "96C3EAE361F81DFCE66F5BF02601601A",
+   "class": "K2Node_CallFunction",
+   "title": "NOT",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "A",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": true
+    },
+    {
+     "name": "ReturnValue",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "F7B4C601B0B5356A3264D6F011901044",
+   "class": "K2Node_VariableSet",
+   "title": "Set SelectedSlot",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "SelectedSlot_5_0123456789ABCDEF0123456789ABCDEF",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "123",
+     "connected": false
+    },
+    {
+     "name": "Output_Get",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "C1A5347B854AF60F7008D6A18E23BE13",
+   "class": "K2Node_CallFunction",
+   "title": "Play Animation\nTarget is User Widget",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InAnimation",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "StartAtTime",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "0.000000",
+     "connected": false
+    },
+    {
+     "name": "NumLoopsToPlay",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "1",
+     "connected": false
+    },
+    {
+     "name": "PlayMode",
+     "type": "byte",
+     "direction": "Input",
+     "defaultValue": "Forward",
+     "connected": false
+    },
+    {
+     "name": "PlaybackSpeed",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "1.000000",
+     "connected": false
+    },
+    {
+     "name": "bRestoreState",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": false
+    },
+    {
+     "name": "ReturnValue",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "FB98E0D83FAB9CC7108777412681E9A5",
+   "class": "K2Node_VariableGet",
+   "title": "Get Button_Start",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Button_Start",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "43162E0EB57A3A3C05D89D6CF729092D",
+   "class": "K2Node_CreateDelegate",
+   "title": "Create Event",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "1D64B3F1647AB1B676279A55CAD7BE2C",
+   "class": "K2Node_AddDelegate",
+   "title": "Bind Event to On Clicked\nTarget is Button",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Delegate",
+     "type": "delegate",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "7472688BCCA59E6969D9141B19357E77",
+   "class": "K2Node_CallFunction",
+   "title": "Get All Actors Of Class",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "ActorClass",
+     "type": "class",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "OutActors",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "3BC4A1455EB13002BADA21509AB5E68F",
+   "class": "K2Node_CallFunction",
+   "title": "Set Actor Location\nTarget is Actor",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "NewLocation",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "0, 0, 0",
+     "connected": false
+    },
+    {
+     "name": "bSweep",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": false
+    },
+    {
+     "name": "SweepHitResult",
+     "type": "struct",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "bTeleport",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": false
+    },
+    {
+     "name": "ReturnValue",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "BD14E68069CF7EC835A15873E00B891B",
+   "class": "K2Node_CallFunction",
+   "title": "Get Player Pawn",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "PlayerIndex",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "0",
+     "connected": false
+    },
+    {
+     "name": "ReturnValue",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "BC6DFE4340E607DE390B3D7F9C5E061C",
+   "class": "K2Node_CallFunction",
+   "title": "Set Render Translation\nTarget is Widget",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Translation",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(X=0.000000,Y=0.000000)",
+     "connected": false
+    },
+    {
+     "name": "Brush",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Tint",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Spin",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "67E16317E73D132B2C989AC42765CB93",
+   "class": "K2Node_CallFunction",
+   "title": "Größe setzen ✓ 🎯\nTarget is A < B & C",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Socket",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "Muzzle",
+     "connected": false
+    },
+    {
+     "name": "Icon",
+     "type": "softobject",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "IconClass",
+     "type": "softclass",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Owner",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Anything",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Hero",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Mode",
+     "type": "enum",
+     "direction": "Input",
+     "defaultValue": "ESlateVisibility::Collapsed",
+     "connected": false
+    },
+    {
+     "name": "Flags",
+     "type": "byte",
+     "direction": "Input",
+     "defaultValue": "3",
+     "connected": false
+    },
+    {
+     "name": "Unset",
+     "type": "enum",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "BigNumber",
+     "type": "int64",
+     "direction": "Input",
+     "defaultValue": "12345678901",
+     "connected": false
+    },
+    {
+     "name": "Ratio",
+     "type": "float",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Weight",
+     "type": "double",
+     "direction": "Input",
+     "defaultValue": "0.25",
+     "connected": false
+    },
+    {
+     "name": "HTMLParserMode",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "a\\b",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "4F004BCD88A884DD578A2F5F73E76A33",
+   "class": "K2Node_CallFunction",
+   "title": "Set Options",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Tags",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Lookup",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Vector2DValue",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "1.5",
+     "connected": false
+    },
+    {
+     "name": "bIsEnabled",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "F9065CAC300B3BB30A91016C27620AA7",
+   "class": "K2Node_CallFunction",
+   "title": "Set Labels",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Title",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Subtitle",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "fallback def",
+     "connected": false
+    },
+    {
+     "name": "Hint",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Empty",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Named",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "BD7CC3E696D626F4FA50CF5B55A634E6",
+   "class": "K2Node_ComponentBoundEvent",
+   "title": "On Clicked (Button_Start)",
+   "posX": 0,
+   "posY": 300,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "BB733C7869441AF7C26BFB18FAB9B8E2",
+   "class": "K2Node_CallFunction",
+   "title": "Remove from Parent\nTarget is Widget",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "C7D8C7C328507EA355AB438F1D9A737E",
+   "class": "K2Node_EnhancedInputAction",
+   "title": "EnhancedInputAction IA_Move",
+   "posX": -100,
+   "posY": 300,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Triggered",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Started",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Ongoing",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Canceled",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Completed",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "ActionValue",
+     "type": "struct",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "ElapsedSeconds",
+     "type": "real",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "TriggeredSeconds",
+     "type": "real",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InputAction",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "70555C130EF3D012C5A3C4D443AA598C",
+   "class": "K2Node_Self",
+   "title": "Self",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "91165C6217138C7346F9A4D0E6FC101B",
+   "class": "K2Node_CallFunction",
+   "title": "Break Vector 2D",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InVec",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "X",
+     "type": "real",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Y",
+     "type": "real",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "23FCA7A0C75B9C456B8302C9820315A7",
+   "class": "K2Node_CallFunction",
+   "title": "Add Movement Input\nTarget is Pawn",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "WorldDirection",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "ScaleValue",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "1.000000",
+     "connected": true
+    },
+    {
+     "name": "bForce",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6954237059D78E72A7F5F0C65137841D",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "stopped",
+     "connected": false
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "D531D61CD51AB8AAD2F57D9D673E7867",
+   "class": "K2Node_FunctionEntry",
+   "title": "Refresh",
+   "posX": 0,
+   "posY": -400,
+   "comment": "",
+   "pins": [
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Amount",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "DFF61A5FE7D12D1273C8F1F2E25C1198",
+   "class": "K2Node_VariableSet",
+   "title": "Set Score",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Score",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "0",
+     "connected": true
+    },
+    {
+     "name": "Output_Get",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6E6FAC9B49C15ED116D6A2C42D1E85A5",
+   "class": "K2Node_PromotableOperator",
+   "title": "Add",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "A",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "0",
+     "connected": true
+    },
+    {
+     "name": "B",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "10",
+     "connected": true
+    },
+    {
+     "name": "ReturnValue",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "44018280896A48D140E22DDE82BFC2E8",
+   "class": "K2Node_VariableGet",
+   "title": "Get Score",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Score",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "BB8FA0DDC8F1AB439389CB35D9868D2B",
+   "class": "K2Node_VariableGet",
+   "title": "Get Bonus",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Bonus",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6DC102B42C78E200CBD512C40C66D9C3",
+   "class": "K2Node_FunctionResult",
+   "title": "Return Node",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Success",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "4C0A04133439D086AFDB07D2484882C9",
+   "class": "K2Node_CustomEvent",
+   "title": "Check A < B & C\nCustom Event",
+   "posX": 0,
+   "posY": -100,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Value",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Label",
+     "type": "text",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "12BA30CA663E33FA886DD652EADA0A8E",
+   "class": "K2Node_Knot",
+   "title": "K2Node_Knot",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "InputPin",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "OutputPin",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "6B62AC25CC8A8B26F7BDC1396432F9FC",
+   "class": "K2Node_CallFunction",
+   "title": "Set Target Value\nTarget is Widget",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "NewValue",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Caption",
+     "type": "text",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false,
+     "defaultTextValue": "Main Menü"
+    },
+    {
+     "name": "bInstant",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "40088E2CAE4FF1EDD47E77007EA62729",
+   "class": "K2Node_Knot",
+   "title": "K2Node_Knot",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "InputPin",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "OutputPin",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "84BBB575309F76EC0372213487B46254",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": -50,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "loose a",
+     "connected": false
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "83457836F4244FD9DEC0FB1DC5CF69DC",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": -200,
+   "posY": -50,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "loose b",
+     "connected": false
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "85C7EA72CF22F1A5C08BDE4CDABFE2CA",
+   "class": "K2Node_CallFunction",
+   "title": "Delay",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "0.1",
+     "connected": false
+    },
+    {
+     "name": "LatentInfo",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(Linkage=-1,UUID=-1,ExecutionFunction=\"\",CallbackTarget=None)",
+     "connected": false
+    }
+   ]
+  }
+ ],
+ "nodeCount": 54,
+ "totalNodeCount": 54,
+ "offset": 0,
+ "limit": 2000,
+ "hasMore": false
+}

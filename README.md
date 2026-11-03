@@ -22,6 +22,7 @@ Upstream sends every agent's calls through one connection, which the plugin answ
 | Oversized requests | close the socket and every call on it | refused with a clear error |
 | UE 5.5.4 | doesn't compile | compiles and runs (verified) |
 | Tool list in context | ~50k tokens | 2k–15k with `--compact`, `--tools`, `--no-epic` |
+| Blueprint node layout | a fixed 360×200 grid, one node per call | readable rows in one call: [`auto_layout`](rust/README.md#blueprint-graph-layout), one undo step |
 
 Measured with three agents building a UMG menu, an inventory component and an interactable item in one UE 5.8 editor at once: 76 calls, 0 errors, 2.2 s wall clock, p50 96 ms ([test script](rust/tools/multi_agent_smoke.py)).
 
@@ -85,6 +86,7 @@ Remove any old Node `ue-mcp` entry so agents don't see every tool twice.
 - **Separate Claude Code sessions** can share one HTTP hub, `ue-mcp-rs.exe <uproject> --http 127.0.0.1:7878`, with each session using `http://127.0.0.1:7878/mcp?agent=<name>`. See the antivirus note below first.
 - **Lock before multi-step edits:** `asset(action="lock", args={assetPath})` … `asset(action="unlock")`.
 - **Give each agent its own folder or sublevel, and prefer batch actions.** The game thread does one thing at a time.
+- **Blueprints: don't let agents position nodes.** They should add and wire nodes anywhere, then call `blueprint(action="auto_layout", args={assetPath})` once.
 
 Example subagent brief:
 

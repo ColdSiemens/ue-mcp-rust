@@ -57,9 +57,15 @@ pub struct Hub {
     pub opts: HubOptions,
     pub project: Option<Project>,
     pub sessions: Mutex<HashMap<String, Arc<Session>>>,
+    /// (lock owner, asset) -> graphs that owner added nodes to since its last
+    /// auto_layout, in the order it touched them.
+    touched: Mutex<HashMap<(String, String), Vec<String>>>,
     started: Instant,
     calls: AtomicU64,
 }
+
+/// Blueprint actions after which a graph counts as touched by the agent.
+pub const GRAPH_WRITES: &[&str] = &["add_node", "import_nodes_t3d", "connect_pins", "connect_pins_batch"];
 
 /// What `tools/call` returns.
 pub struct ToolResult {
@@ -135,8 +141,25 @@ impl Hub {
             opts,
             project,
             sessions: Mutex::new(HashMap::new()),
+            touched: Mutex::new(HashMap::new()),
             started: Instant::now(),
             calls: AtomicU64::new(0),
+        }
+    }
+
+    pub fn touched_graphs(&self, owner: &str, asset: &str) -> Vec<String> {
+        self.touched.lock().unwrap().get(&(owner.to_string(), locks::normalize(asset))).cloned().unwrap_or_default()
+    }
+
+    pub fn forget_touched(&self, owner: &str, asset: &str) {
+        self.touched.lock().unwrap().remove(&(owner.to_string(), locks::normalize(asset)));
+    }
+
+    fn note_touched(&self, owner: &str, asset: &str, graph: &str) {
+        let mut touched = self.touched.lock().unwrap();
+        let graphs = touched.entry((owner.to_string(), locks::normalize(asset))).or_default();
+        if !graphs.iter().any(|g| g == graph) {
+            graphs.push(graph.to_string());
         }
     }
 
@@ -207,6 +230,14 @@ impl Hub {
 
         let wants_wait = action.follow_up && params.get("wait") == Some(&Value::Bool(true));
         let wait_timeout = params.get("timeoutSeconds").and_then(Value::as_f64);
+        // Which graph this call adds nodes to, so auto_layout can default to it.
+        let touches = (tool.name == "blueprint" && GRAPH_WRITES.contains(&action.name.as_str()))
+            .then(|| {
+                let asset = params.get("assetPath").or_else(|| params.get("path")).and_then(Value::as_str)?;
+                let graph = params.get("graphSelector").or_else(|| params.get("graphName")).and_then(Value::as_str).unwrap_or("EventGraph");
+                Some((asset.to_string(), graph.to_string()))
+            })
+            .flatten();
 
         let outcome = match &action.dispatch {
             Dispatch::Bridge { method } => self.bridge_call(method, Value::Object(params), routing.timeout_ms.or(action.timeout_ms)).await,
@@ -224,6 +255,9 @@ impl Hub {
         match outcome {
             Ok(v) => {
                 let is_error = v.get("success") == Some(&Value::Bool(false));
+                if let (false, Some((asset, graph))) = (is_error, &touches) {
+                    self.note_touched(&owner, asset, graph);
+                }
                 let v = routing.shape(v);
                 let text = match v {
                     Value::String(s) => s,
@@ -435,6 +469,8 @@ impl Hub {
                 project_files::search_config(project, query)
             }
             ("project", "list_config_tags") => project_files::list_config_tags(self.project.as_ref().ok_or("no project loaded")?),
+            ("blueprint", "auto_layout") => self.auto_layout(&owner, &p).await,
+            ("blueprint", "restore_layout") => self.restore_layout(&owner, &p).await,
             (t, a) => Err(format!("{t}({a}) is not available in ue-mcp-rust")),
         }
     }

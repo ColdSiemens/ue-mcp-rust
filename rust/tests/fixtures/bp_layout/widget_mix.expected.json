@@ -1,0 +1,499 @@
+{
+ "pos": {
+  "K2Node_Event_0": {
+   "x": 0,
+   "y": 0
+  },
+  "K2Node_CallFunction_0": {
+   "x": 427,
+   "y": 16
+  },
+  "K2Node_VariableGet_0": {
+   "x": 275,
+   "y": 95
+  },
+  "K2Node_CallFunction_1": {
+   "x": 894,
+   "y": 16
+  },
+  "K2Node_CallFunction_2": {
+   "x": 1243,
+   "y": 16
+  },
+  "K2Node_CallFunction_3": {
+   "x": 1520,
+   "y": 31
+  },
+  "K2Node_Event_1": {
+   "x": 0,
+   "y": 570
+  },
+  "K2Node_ExecutionSequence_0": {
+   "x": 250,
+   "y": 600
+  },
+  "K2Node_MacroInstance_0": {
+   "x": 587,
+   "y": 600
+  },
+  "K2Node_VariableGet_1": {
+   "x": 454,
+   "y": 665
+  },
+  "K2Node_CallFunction_4": {
+   "x": 1010,
+   "y": 586
+  },
+  "K2Node_VariableGet_2": {
+   "x": 861,
+   "y": 665
+  },
+  "K2Node_CallFunction_5": {
+   "x": 1670,
+   "y": 705
+  },
+  "K2Node_CallFunction_6": {
+   "x": 1495,
+   "y": 770
+  },
+  "K2Node_FormatText_0": {
+   "x": 1106,
+   "y": 770
+  },
+  "K2Node_CallArrayFunction_0": {
+   "x": 861,
+   "y": 830
+  },
+  "K2Node_VariableGet_5": {
+   "x": 945,
+   "y": 883
+  },
+  "K2Node_IfThenElse_0": {
+   "x": 1049,
+   "y": 959
+  },
+  "K2Node_CommutativeAssociativeBinaryOperator_0": {
+   "x": 805,
+   "y": 1024
+  },
+  "K2Node_VariableGet_3": {
+   "x": 661,
+   "y": 1024
+  },
+  "K2Node_CallFunction_8": {
+   "x": 601,
+   "y": 1076
+  },
+  "K2Node_VariableGet_4": {
+   "x": 454,
+   "y": 1077
+  },
+  "K2Node_VariableSet_0": {
+   "x": 1300,
+   "y": 959
+  },
+  "K2Node_CallFunction_9": {
+   "x": 1300,
+   "y": 1101
+  },
+  "K2Node_AddDelegate_0": {
+   "x": 764,
+   "y": 1367
+  },
+  "K2Node_VariableGet_6": {
+   "x": 598,
+   "y": 1446
+  },
+  "K2Node_CreateDelegate_0": {
+   "x": 454,
+   "y": 1498
+  },
+  "K2Node_CallFunction_10": {
+   "x": 1041,
+   "y": 1381
+  },
+  "K2Node_CallFunction_11": {
+   "x": 1862,
+   "y": 1367
+  },
+  "K2Node_CallFunction_12": {
+   "x": 1529,
+   "y": 1446
+  },
+  "K2Node_CallFunction_13": {
+   "x": 2198,
+   "y": 1367
+  },
+  "K2Node_CallFunction_14": {
+   "x": 2465,
+   "y": 1367
+  },
+  "K2Node_CallFunction_15": {
+   "x": 2888,
+   "y": 1381
+  },
+  "K2Node_CallFunction_16": {
+   "x": 3197,
+   "y": 1381
+  },
+  "K2Node_FunctionEntry_0": {
+   "x": 0,
+   "y": 2144
+  },
+  "K2Node_VariableSet_1": {
+   "x": 603,
+   "y": 2144
+  },
+  "K2Node_PromotableOperator_0": {
+   "x": 422,
+   "y": 2208
+  },
+  "K2Node_VariableGet_7": {
+   "x": 299,
+   "y": 2209
+  },
+  "K2Node_VariableGet_8": {
+   "x": 180,
+   "y": 2261
+  },
+  "K2Node_FunctionResult_0": {
+   "x": 802,
+   "y": 2144
+  },
+  "K2Node_CustomEvent_0": {
+   "x": 0,
+   "y": 2557
+  },
+  "K2Node_Knot_0": {
+   "x": 250,
+   "y": 2634
+  },
+  "K2Node_CallFunction_20": {
+   "x": 454,
+   "y": 2587
+  },
+  "K2Node_Knot_1": {
+   "x": 362,
+   "y": 2666
+  },
+  "K2Node_EnhancedInputAction_0": {
+   "x": 0,
+   "y": 3036
+  },
+  "K2Node_CallFunction_19": {
+   "x": 549,
+   "y": 3021
+  },
+  "K2Node_Self_0": {
+   "x": 397,
+   "y": 3100
+  },
+  "K2Node_CallFunction_18": {
+   "x": 343,
+   "y": 3182
+  },
+  "K2Node_CallFunction_27": {
+   "x": 343,
+   "y": 3318
+  },
+  "K2Node_ComponentBoundEvent_0": {
+   "x": 0,
+   "y": 3697
+  },
+  "K2Node_CallFunction_17": {
+   "x": 309,
+   "y": 3713
+  },
+  "K2Node_CallFunction_29": {
+   "x": 0,
+   "y": 4052
+  },
+  "K2Node_CallFunction_30": {
+   "x": 290,
+   "y": 4052
+  },
+  "K2Node_CallFunction_28": {
+   "x": 0,
+   "y": 4431
+  }
+ },
+ "size": {
+  "K2Node_Event_0": {
+   "w": 205,
+   "h": 125
+  },
+  "K2Node_VariableGet_0": {
+   "w": 102,
+   "h": 32
+  },
+  "K2Node_CallFunction_0": {
+   "w": 397,
+   "h": 143
+  },
+  "K2Node_CallFunction_1": {
+   "w": 279,
+   "h": 143
+  },
+  "K2Node_CallFunction_2": {
+   "w": 207,
+   "h": 140
+  },
+  "K2Node_CallFunction_3": {
+   "w": 471,
+   "h": 279
+  },
+  "K2Node_Event_1": {
+   "w": 180,
+   "h": 95
+  },
+  "K2Node_ExecutionSequence_0": {
+   "w": 134,
+   "h": 130
+  },
+  "K2Node_MacroInstance_0": {
+   "w": 204,
+   "h": 158
+  },
+  "K2Node_VariableGet_1": {
+   "w": 83,
+   "h": 32
+  },
+  "K2Node_VariableGet_2": {
+   "w": 99,
+   "h": 32
+  },
+  "K2Node_CallFunction_4": {
+   "w": 212,
+   "h": 140
+  },
+  "K2Node_CallFunction_5": {
+   "w": 143,
+   "h": 116
+  },
+  "K2Node_FormatText_0": {
+   "w": 349,
+   "h": 126
+  },
+  "K2Node_CallArrayFunction_0": {
+   "w": 205,
+   "h": 33
+  },
+  "K2Node_VariableGet_5": {
+   "w": 121,
+   "h": 32
+  },
+  "K2Node_CallFunction_6": {
+   "w": 125,
+   "h": 33
+  },
+  "K2Node_IfThenElse_0": {
+   "w": 181,
+   "h": 97
+  },
+  "K2Node_CommutativeAssociativeBinaryOperator_0": {
+   "w": 194,
+   "h": 81
+  },
+  "K2Node_VariableGet_3": {
+   "w": 104,
+   "h": 32
+  },
+  "K2Node_VariableGet_4": {
+   "w": 107,
+   "h": 32
+  },
+  "K2Node_CallFunction_8": {
+   "w": 164,
+   "h": 33
+  },
+  "K2Node_VariableSet_0": {
+   "w": 227,
+   "h": 98
+  },
+  "K2Node_CallFunction_9": {
+   "w": 445,
+   "h": 236
+  },
+  "K2Node_VariableGet_6": {
+   "w": 116,
+   "h": 32
+  },
+  "K2Node_CreateDelegate_0": {
+   "w": 260,
+   "h": 99
+  },
+  "K2Node_AddDelegate_0": {
+   "w": 207,
+   "h": 140
+  },
+  "K2Node_CallFunction_10": {
+   "w": 418,
+   "h": 98
+  },
+  "K2Node_CallFunction_11": {
+   "w": 266,
+   "h": 201
+  },
+  "K2Node_CallFunction_12": {
+   "w": 283,
+   "h": 65
+  },
+  "K2Node_CallFunction_13": {
+   "w": 197,
+   "h": 235
+  },
+  "K2Node_CallFunction_14": {
+   "w": 353,
+   "h": 517
+  },
+  "K2Node_CallFunction_15": {
+   "w": 239,
+   "h": 224
+  },
+  "K2Node_CallFunction_16": {
+   "w": 243,
+   "h": 234
+  },
+  "K2Node_ComponentBoundEvent_0": {
+   "w": 239,
+   "h": 95
+  },
+  "K2Node_CallFunction_17": {
+   "w": 184,
+   "h": 79
+  },
+  "K2Node_EnhancedInputAction_0": {
+   "w": 273,
+   "h": 149
+  },
+  "K2Node_Self_0": {
+   "w": 102,
+   "h": 62
+  },
+  "K2Node_CallFunction_18": {
+   "w": 156,
+   "h": 92
+  },
+  "K2Node_CallFunction_19": {
+   "w": 186,
+   "h": 222
+  },
+  "K2Node_CallFunction_27": {
+   "w": 224,
+   "h": 119
+  },
+  "K2Node_FunctionEntry_0": {
+   "w": 110,
+   "h": 95
+  },
+  "K2Node_VariableSet_1": {
+   "w": 129,
+   "h": 95
+  },
+  "K2Node_PromotableOperator_0": {
+   "w": 131,
+   "h": 57
+  },
+  "K2Node_VariableGet_7": {
+   "w": 83,
+   "h": 32
+  },
+  "K2Node_VariableGet_8": {
+   "w": 202,
+   "h": 36
+  },
+  "K2Node_FunctionResult_0": {
+   "w": 144,
+   "h": 95
+  },
+  "K2Node_CustomEvent_0": {
+   "w": 180,
+   "h": 170
+  },
+  "K2Node_Knot_0": {
+   "w": 42,
+   "h": 24
+  },
+  "K2Node_CallFunction_20": {
+   "w": 242,
+   "h": 174
+  },
+  "K2Node_Knot_1": {
+   "w": 42,
+   "h": 24
+  },
+  "K2Node_CallFunction_28": {
+   "w": 219,
+   "h": 119
+  },
+  "K2Node_CallFunction_29": {
+   "w": 220,
+   "h": 119
+  },
+  "K2Node_CallFunction_30": {
+   "w": 199,
+   "h": 98
+  }
+ },
+ "rows": [
+  {
+   "root": "K2Node_Event_0",
+   "top": 0,
+   "bottom": 310,
+   "right": 1991
+  },
+  {
+   "root": "K2Node_Event_1",
+   "top": 570,
+   "bottom": 1884,
+   "right": 3440
+  },
+  {
+   "root": "K2Node_FunctionEntry_0",
+   "top": 2144,
+   "bottom": 2297,
+   "right": 946
+  },
+  {
+   "root": "K2Node_CustomEvent_0",
+   "top": 2557,
+   "bottom": 2761,
+   "right": 696
+  },
+  {
+   "root": "K2Node_EnhancedInputAction_0",
+   "top": 3021,
+   "bottom": 3437,
+   "right": 735
+  },
+  {
+   "root": "K2Node_ComponentBoundEvent_0",
+   "top": 3697,
+   "bottom": 3792,
+   "right": 493
+  },
+  {
+   "root": "K2Node_CallFunction_29",
+   "top": 4052,
+   "bottom": 4171,
+   "right": 489
+  },
+  {
+   "root": "K2Node_CallFunction_28",
+   "top": 4431,
+   "bottom": 4550,
+   "right": 219
+  }
+ ],
+ "warnings": [],
+ "order": [
+  "K2Node_Event_0",
+  "K2Node_Event_1",
+  "K2Node_FunctionEntry_0",
+  "K2Node_CustomEvent_0",
+  "K2Node_EnhancedInputAction_0",
+  "K2Node_ComponentBoundEvent_0",
+  "K2Node_CallFunction_29",
+  "K2Node_CallFunction_28"
+ ]
+}

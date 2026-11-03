@@ -500,6 +500,14 @@ void FBlueprintHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 		SpecPosX,
 		SpecPosY,
 	});
+	// Layout tools move every node of a graph. One call per node cost a round
+	// trip and an open graph view's redraw each (~0.45 s per node with the
+	// graph open) and left nothing Ctrl+Z could undo.
+	Registry.RegisterHandler(TEXT("set_node_positions"), &SetNodePositions, {
+		SpecAssetPath,
+		SpecGraphName,
+		MCPParam::Required(TEXT("positions"), EType::Array, TEXT("[{nodeId, posX, posY}]: node GUID or name, and its new position")).Items(EType::Object),
+	});
 	Registry.RegisterHandler(TEXT("auto_layout_graph"), &AutoLayoutGraph, {
 		SpecAssetPath,
 		SpecGraphName,
