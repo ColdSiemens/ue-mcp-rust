@@ -36,8 +36,10 @@ struct FakeBridge {
     state: Arc<FakeState>,
 }
 
-/// Every bridge method in the embedded surface except `read_blueprint` and
-/// `epic_call_tool`, so the hub's unregistered-action filtering is visible.
+/// Every bridge method in the embedded surface except `read_blueprint`, so the
+/// hub's unregistered-action filtering is visible. `epic_call_tool` stays
+/// registered, as the real plugin registers it on every engine; the fake
+/// reports 5.5.4, where the hub must still hide epic actions.
 fn registered_methods() -> Vec<String> {
     let surface: Value = serde_json::from_str(include_str!("../surface/surface.json")).unwrap();
     let mut out: Vec<String> = surface["tools"]
@@ -47,7 +49,7 @@ fn registered_methods() -> Vec<String> {
         .flat_map(|t| t["actions"].as_object().unwrap().values())
         .filter(|a| a["kind"] == "bridge")
         .filter_map(|a| a["bridge"].as_str().map(str::to_string))
-        .filter(|m| m != "read_blueprint" && m != "epic_call_tool")
+        .filter(|m| m != "read_blueprint")
         .collect();
     out.extend(["acquire_lock", "release_lock", "release_session_locks"].map(String::from));
     out.sort();
@@ -238,7 +240,8 @@ async fn lists_tools_and_hides_what_the_plugin_lacks() {
     let blueprint = action_names(&tools, "blueprint");
     assert!(blueprint.contains(&"add_variable".to_string()));
     assert!(!blueprint.contains(&"read".to_string()), "read_blueprint is not registered by the plugin");
-    assert!(!action_names(&tools, "level").iter().any(|a| a.starts_with("epic_")), "no epic_call_tool, no epic actions");
+    assert!(!action_names(&tools, "level").iter().any(|a| a.starts_with("epic_")), "epic actions are hidden below UE 5.8");
+    assert!(!tools["tools"].as_array().unwrap().iter().any(|t| t["name"] == "epic"), "so is the epic category");
     assert!(action_names(&tools, "project").contains(&"describe_action".to_string()));
 
     let full = tools.to_string().len();
@@ -486,5 +489,9 @@ async fn actions_the_editor_lacks_are_refused_without_a_round_trip() {
     let (_, text) = hub.call("project", "describe_action", json!({ "name": "blueprint.add_variable" })).await;
     let described: Value = serde_json::from_str(&text).unwrap();
     assert_eq!(described["availableInRunningEditor"], true);
+
+    // epic_call_tool is registered (as on a real 5.5 plugin), but the editor is 5.5.4.
+    let (err, text) = hub.call("level", "epic_add_tag", json!({ "assetPath": "/Game/Maps/Arena", "tag": "x" })).await;
+    assert!(err && text.contains("toolset registry, which is UE 5.8+"), "{text}");
     fake.stop();
 }

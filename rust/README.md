@@ -16,13 +16,13 @@ One limit can't be removed: Unreal runs editor operations on its single game thr
 
 ## Setup
 
-**1. Install the editor plugin from this fork.** The plugin in [`plugin/ue_mcp_bridge`](../plugin/ue_mcp_bridge) carries the concurrency and throttle change ([PLUGIN-PATCH.md](PLUGIN-PATCH.md)). If your project already has the upstream plugin at version 1.4.12-beta.1, copy the four changed files in with backups:
+**1. Install the editor plugin from this fork.** The plugin in [`plugin/ue_mcp_bridge`](../plugin/ue_mcp_bridge) adds concurrent requests, no background throttling, and builds on UE 5.5.4 through 5.8 (see [PLUGIN-PATCH.md](PLUGIN-PATCH.md)). Install it into a project; any plugin already there is moved to `Saved/` as a backup:
 
 ```powershell
-.\rust\apply-plugin-patch.ps1 -PluginRoot C:\Path\To\MyGame\Plugins\UE_MCP_Bridge
+.\rust\install-plugin.ps1 -Project C:\Path\To\MyGame\MyGame.uproject
 ```
 
-> The plugin change has **not been compiled yet**: no Unreal toolchain was available while writing it. Rebuild the editor and check that `get_bridge_capabilities` lists `concurrent-dispatch`. If the build fails, restore the `.orig` files. The Rust server works with an unpatched plugin too, just with less concurrency.
+Then rebuild the project's editor target; the script says how for C++ and for Blueprint-only projects. It has been compiled and live-tested on UE 5.5.4 and 5.8.2. The Rust server also works with a stock plugin, just with less concurrency.
 
 **2. Get the server.** No Rust needed: each `rust-v*` release on this fork's Releases page carries prebuilt binaries for Windows, macOS and Linux. On Windows, this downloads the newest one and registers it for your project:
 

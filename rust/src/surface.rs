@@ -130,6 +130,10 @@ pub struct View {
 
 impl View {
     pub fn allows_tool(&self, name: &str) -> bool {
+        // The epic category is the toolset registry itself; nothing in it works without one.
+        if self.hide_epic && name == "epic" {
+            return false;
+        }
         name == "project" || self.tools.as_ref().is_none_or(|t| t.contains(name))
     }
 

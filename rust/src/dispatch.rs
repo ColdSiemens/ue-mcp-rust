@@ -146,6 +146,11 @@ impl Hub {
         view.hide_epic |= self.opts.hide_epic;
         if self.opts.hide_unregistered {
             view.registered = self.bridge.registered_methods();
+            // The plugin registers epic_call_tool on every engine, but the
+            // toolset registry it calls into is UE 5.8+.
+            if self.bridge.engine_version().as_deref().and_then(engine_minor).is_some_and(|v| v < (5, 8)) {
+                view.hide_epic = true;
+            }
         }
         view
     }
@@ -176,7 +181,7 @@ impl Hub {
             _ => return ToolResult::error(format!("{name}: 'action' is required, e.g. {name}(action=\"{}\", args={{...}})", tool.actions[0].name)),
         };
         let view = self.effective_view(session);
-        let Some(action) = tool.action(&action_name).filter(|a| !(view.hide_epic && a.is_epic())) else {
+        let Some(action) = tool.action(&action_name) else {
             return ToolResult::error(unknown_action(tool, &action_name));
         };
         // Guard: never send an editor a method its plugin build does not have.
@@ -232,6 +237,12 @@ impl Hub {
 
     fn unavailable_message(&self, tool: &Tool, action: &Action) -> String {
         let engine = self.bridge.engine_version().map(|v| format!("UE {v}")).unwrap_or_else(|| "this engine version".into());
+        if action.is_epic() {
+            return format!(
+                "{}.{} wraps Unreal's editor toolset registry, which is UE 5.8+ (running editor: {engine}), or epic actions are turned off on this server. Nothing was sent to the editor; project(action=\"search_tools\") finds alternatives.",
+                tool.name, action.name
+            );
+        }
         format!(
             "{}.{} is not available in the running editor ({engine}): its UE_MCP_Bridge build does not register '{}'. The engine API it needs is newer than this version, or the plugin is older than this server. Nothing was sent to the editor; project(action=\"search_tools\") finds alternatives.",
             tool.name,
@@ -679,6 +690,12 @@ impl Hub {
     }
 }
 
+/// (major, minor) from an engine version like "5.5.4-40574608+++UE5+Release-5.5".
+fn engine_minor(version: &str) -> Option<(u32, u32)> {
+    let mut parts = version.split(['.', '-']);
+    Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
+}
+
 fn describe(method: &str, e: BridgeError) -> String {
     match e {
         BridgeError::Rpc { code: -32601, message } => {
@@ -773,6 +790,13 @@ mod tests {
         assert_eq!(p["a"], 1);
         assert_eq!(p["b"], 2);
         assert_eq!(p["action"], "x");
+    }
+
+    #[test]
+    fn engine_versions_parse() {
+        assert_eq!(engine_minor("5.5.4-40574608+++UE5+Release-5.5"), Some((5, 5)));
+        assert_eq!(engine_minor("5.8.2-56702186+++UE5+Release-5.8"), Some((5, 8)));
+        assert_eq!(engine_minor("garbage"), None);
     }
 
     #[test]

@@ -1,8 +1,13 @@
-# UE_MCP_Bridge concurrency change
+# UE_MCP_Bridge changes in this fork
 
-> **Not compiled yet.** It was written without an Unreal toolchain and has only been reviewed by reading. Build it before relying on it. If the build fails, the opt-outs below won't help; restore the `.orig` files instead.
+This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1) plus three changes:
+1. Concurrent requests per socket.
+2. No background throttling while a client is connected.
+3. Builds on UE 5.5.4.
 
-This fork's `plugin/ue_mcp_bridge` carries the change as one commit (`feat(bridge): run requests concurrently per socket, stop background throttling`) on top of upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1). `git show` on that commit is the patch.
+Status:
+- Compiled on UE 5.8.2 and UE 5.5.4. `rust/tools/check-engine-compat.ps1` repeats the check.
+- Live-tested on UE 5.8.2: start, reads, one-socket concurrency, parallel reads and stop all passed, and the editor log shows throttling suspended.
 
 ## What changes
 
@@ -25,6 +30,27 @@ This fork's `plugin/ue_mcp_bridge` carries the change as one commit (`feat(bridg
 - Module shutdown removes any queued update and restores the setting.
 - Interplay with the automation-test handler (`EditorHandlers.cpp` ~4866): that handler only restores what it changed itself. While the bridge is holding the flag off it finds it already off and does nothing.
 
+**3. Builds on UE 5.5.4** (handler and header gates)
+
+Upstream says it supports 5.4–5.8, but 153 distinct compile errors and 5 link errors stopped it building on 5.5.4. Most came from gates that assumed an API arrived in 5.5 when it actually arrived later. Every fix was checked against the installed 5.5.4 and 5.8.2 headers:
+
+- Where upstream already had an older-engine path, the gate moved to the version the API was actually found in. Usually that is 5.8, because 5.6 and 5.7 couldn't be checked, and a path that exists in both 5.5 and 5.8 is safe in between.
+- Where 5.5 has an equivalent, a 5.5 branch uses it. Examples: MetaSound builder lookups through the frontend document builder; landscape edit layers through `GetLayers()`; StateTree `SetLinkedState` done step by step.
+- Classes that 5.5 declares without an export macro are resolved by reflection path, e.g. `/Script/Engine.WorldPartitionRuntimeCellTransformer`.
+- The 5.8 code path is upstream's code, unchanged.
+
+What is missing below UE 5.8 (verified absent in 5.5.4; may exist in 5.6/5.7):
+
+| Area | Behaviour on 5.5 |
+|---|---|
+| `list_niagara_module_inputs`, `set_niagara_module_input`, `set_niagara_dynamic_input` | Return "requires UE 5.8": the NiagaraEditor stack API isn't exported before 5.8. |
+| `metasound_remove_member` with `memberKind: "variable"` | Returns "requires UE 5.8". Inputs and outputs still work. |
+| `set_pose_search_database_settings` with `poseSearchMode: "eventonly"` | Returns "requires UE 5.8" (the mode doesn't exist). |
+| `request_state_tree_transition` with `fallback` | Returns "requires UE 5.8". The transition itself works. |
+| `epic_*` actions | Need UE 5.8's toolset registry; the Rust server hides them on older editors. |
+| Output fields | Omitted where 5.5 has no data: StateTree schema flags and `tasksCompletion`, `description` (needs 5.6), `numExternalObjects`, plugin `mounted`, trace bytes emitted. Relay trace states read "unknown"; sound concurrency reports the authored `MaxCount`. |
+| Widget variable GUIDs | Not synced, because 5.5 widget blueprints have no GUID map. |
+
 ## Opt-outs
 
 | Setting | Effect |
@@ -34,17 +60,16 @@ This fork's `plugin/ue_mcp_bridge` carries the change as one commit (`feat(bridg
 
 ## Install
 
-To patch a project that already has the upstream plugin installed, run from the repository root:
+From the repository root:
 
 ```powershell
-.\rust\apply-plugin-patch.ps1 -PluginRoot C:\MyGame\Plugins\UE_MCP_Bridge                    # C++ project: then build the Editor target
-.\rust\apply-plugin-patch.ps1 -PluginRoot C:\MyGame\Plugins\UE_MCP_Bridge -SetAsideBinaries  # Blueprint-only / prebuilt binaries
+.\rust\install-plugin.ps1 -Project C:\MyGame\MyGame.uproject
 ```
 
-- The script copies the four changed files from this repository's `plugin/` folder. It refuses if the installed `BridgeServer.cpp`/`.h` are not the 1.4.12-beta.1 version. If yours differ, update the plugin to that version first, or cherry-pick the commit onto your version.
-- Originals are kept as `*.orig`. `-SetAsideBinaries` renames `Binaries`/`Intermediate` (it deletes nothing) so the editor offers to rebuild the module.
-- The upstream ue-mcp updater (`ue-mcp-update`, or the Node server's bridge auto-update) redeploys stock plugin sources and will overwrite this change. Turn it off or re-apply afterwards.
-- After merging a newer upstream into this fork, the base hashes in `apply-plugin-patch.ps1` need updating to the new upstream version.
+- Copies the whole plugin source into `<Project>\Plugins\UE_MCP_Bridge`. An existing copy (stock, or patched by hand) is moved to `<Project>\Saved\UE_MCP_Bridge-backup-<timestamp>`, since two copies under `Plugins\` would clash.
+- No binaries are copied. The module is compiled for the project's own engine on the next build: a C++ project builds its Editor target; a Blueprint-only project accepts the editor's rebuild prompt, which needs Visual Studio's C++ tools.
+- The upstream ue-mcp updater (`ue-mcp-update`, or the Node server's bridge auto-update) redeploys stock plugin sources and will overwrite this one. Turn it off, or rerun the script afterwards.
+- After merging a newer upstream into this fork, run `rust\tools\check-engine-compat.ps1` before installing.
 
 ## Verify
 

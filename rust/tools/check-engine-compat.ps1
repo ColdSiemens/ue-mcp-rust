@@ -130,3 +130,4 @@ foreach ($engine in $engines) {
 
 $results | Format-Table -AutoSize | Out-String | Write-Host
 if ($results | Where-Object Result -ne 'OK') { exit 1 }
+exit 0
