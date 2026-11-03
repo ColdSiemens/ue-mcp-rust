@@ -1082,10 +1082,15 @@ TSharedPtr<FJsonValue> FSkeletalMeshHandlers::SetSkinWeights(const TSharedPtr<FJ
 		// render data. This does not write another profile's source weights.
 		CommitParams.bUpdateSkinWeightProfiles = !Target.ProfileName.IsNone();
 		CommitParams.bUpdateVertexAttributes = false;
+#if UE_MCP_HAS_5_8_API
 		CommitParams.bUpdateVertexColors = false;
 #else
+		// FCommitMeshDescriptionParams has no bUpdateVertexColors in 5.5.4 (it
+		// is in 5.8); the commit there has no switch for the vertex color state.
+#endif
+#else
 		// 5.4's params carry only bMarkPackageDirty and bForceUpdate; it always
-		// refreshes the derived data the four flags above select on 5.5+.
+		// refreshes the derived data the flags above select on 5.5+.
 #endif
 		CommitParams.bForceUpdate = true;
 		if (!Target.Mesh->CommitMeshDescription(Target.LodIndex, CommitParams))

@@ -585,12 +585,12 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::SetDynamicInput(const TSharedPtr<FJsonO
 	const FString EmitterName = OptionalString(Params, TEXT("emitterName"), TEXT(""));
 	const int32 EmitterIndex = OptionalInt(Params, TEXT("emitterIndex"), 0);
 
-#if !UE_MCP_HAS_5_5_API
+#if !UE_MCP_HAS_5_8_API
 	(void)EmitterIndex;
 	// FNiagaraStackGraphUtilities::GetStackFunctionInputs and
-	// FNiagaraStackFunctionInputBinder are declared but not exported in 5.4, and no reflected API stands in for them.
-	return MCPUnsupportedEngineError(TEXT("Niagara module input editing"), TEXT("5.5"),
-		TEXT("The NiagaraEditor stack API it reads and writes through is not exported in 5.4."));
+	// FNiagaraStackFunctionInputBinder are declared without NIAGARAEDITOR_API before 5.8 (checked against 5.5.4), and no reflected API stands in for them.
+	return MCPUnsupportedEngineError(TEXT("Niagara module input editing"), TEXT("5.8"),
+		TEXT("The NiagaraEditor stack API it reads and writes through is not exported before 5.8."));
 #else
 
 	if (MCPIsProtectedAssetPath(SystemPath)) return MCPProtectedPathError(SystemPath);

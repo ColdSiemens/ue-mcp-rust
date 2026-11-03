@@ -1466,7 +1466,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::ApplyAnimationModifier(const TSharedP
 	bool bRegistered = false;
 	if (!Instance)
 	{
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API // AddAnimationModifierOfClass: not in 5.5.4, in 5.8
 		UAnimationModifiersAssetUserData::AddAnimationModifierOfClass(Seq, ModClass);
 		bRegistered = true;
 #else

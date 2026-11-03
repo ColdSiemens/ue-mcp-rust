@@ -405,10 +405,10 @@ namespace
 	{
 		if (Category == TEXT("composite"))
 		{
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 			UClass* const SimpleParallelNodeClass = UBehaviorTreeGraphNode_SimpleParallel::StaticClass();
 #else
-			// 5.4 declares UBehaviorTreeGraphNode_SimpleParallel without an
+			// Before 5.8 (checked against 5.4 and 5.5.4) UBehaviorTreeGraphNode_SimpleParallel has no
 			// export macro, so its StaticClass() does not link outside
 			// BehaviorTreeEditor. The class is registered like any other, so it
 			// is resolved by path there; a null result falls back to the plain

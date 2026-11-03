@@ -27,7 +27,14 @@
 #include "Editor.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
+// Misc/StringOutputDevice.h is not in 5.5.4 (FStringOutputDevice is still in
+// UnrealString.h); 5.8 includes it from UnrealString.h only under
+// UE_ENABLE_INCLUDE_ORDER_DEPRECATED_IN_5_7, so the split is taken as 5.7.
+#if UE_MCP_HAS_5_7_API
 #include "Misc/StringOutputDevice.h"
+#else
+#include "Containers/UnrealString.h"
+#endif
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "EditorScriptingUtilities/Public/EditorAssetLibrary.h"

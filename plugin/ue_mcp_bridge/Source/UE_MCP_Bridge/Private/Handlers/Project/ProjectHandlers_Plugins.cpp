@@ -224,13 +224,14 @@ static TSharedPtr<FJsonObject> PPlug_Describe(const TSharedRef<IPlugin>& Plugin,
 	// `enabled` is the state of THIS editor session, decided at startup. It does
 	// not follow a write made in this session; `projectReference` does.
 	Obj->SetBoolField(TEXT("enabled"), Plugin->IsEnabled());
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	Obj->SetBoolField(TEXT("mounted"), Plugin->IsMounted());
 #else
-	// IPlugin::IsMounted() arrived after 5.4, and nothing there answers the
-	// same question: `enabled` is close but not the same fact, and reporting it
-	// under this name would make an approximation look like a reading. The
-	// field is left out on 5.4, the way canEnableInCurrentTarget is below.
+	// IPlugin::IsMounted() is not in 5.5.4 (it is in 5.8), and nothing there
+	// answers the same question: `enabled` is close but not the same fact, and
+	// reporting it under this name would make an approximation look like a
+	// reading. The field is left out there, the way canEnableInCurrentTarget
+	// is on 5.4.
 #endif
 	Obj->SetBoolField(TEXT("enabledByDefault"), Plugin->IsEnabledByDefault(/*bAllowEnginePluginsEnabledByDefault*/ true));
 	Obj->SetBoolField(TEXT("isBeta"), Descriptor.bIsBetaVersion);

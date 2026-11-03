@@ -17,8 +17,10 @@
 
 // True on UE 5.5+ (and any future 6.x). Used to gate APIs introduced in 5.5
 // that don't exist in 5.4: StateTreeEditingSubsystem, FExpressionInputIterator,
-// AActor::Get/SetNetUpdateFrequency, UWidgetBlueprint::WidgetVariableNameToGuidMap,
-// UPCGEditorGraphNodeBase, UIKRetargeterController::AssignIKRigToAllOps, etc.
+// AActor::Get/SetNetUpdateFrequency, UPCGEditorGraphNodeBase,
+// UIKRetargeterController::AssignIKRigToAllOps, etc. Several APIs upstream
+// once gated here are not in 5.5.4 (UWidgetBlueprint::WidgetVariableNameToGuidMap,
+// the Nanite and curve-metadata accessors); those are gated at 5.8 instead.
 #define UE_MCP_HAS_5_5_API ((ENGINE_MAJOR_VERSION > 5) || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5))
 
 // True on UE 5.6+ (and any future 6.x). The gate between 5.5 and 5.7, kept so
@@ -46,12 +48,13 @@
 // here rather than in a handler, so two handlers cannot end up with two
 // spellings of the same rule. Headers that moved live in MCPEngineCompat.h.
 
-/** UStaticMesh Nanite settings. 5.5 added the accessor pair; 5.4 has only the
- *  member, which 5.7 in turn deprecated direct access to. */
+/** UStaticMesh Nanite settings. Through 5.5 there is only the member (checked
+ *  against 5.5.4, which has no accessor pair); 5.7 deprecated direct access in
+ *  favour of the accessors, so they are used from 5.7 and the member before. */
 inline FMeshNaniteSettings MCPGetNaniteSettings(const UStaticMesh* Mesh)
 {
 	if (!Mesh) return FMeshNaniteSettings();
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_7_API
 	return Mesh->GetNaniteSettings();
 #else
 	return Mesh->NaniteSettings;
@@ -62,18 +65,19 @@ inline FMeshNaniteSettings MCPGetNaniteSettings(const UStaticMesh* Mesh)
 inline void MCPSetNaniteSettings(UStaticMesh* Mesh, const FMeshNaniteSettings& InSettings)
 {
 	if (!Mesh) return;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_7_API
 	Mesh->SetNaniteSettings(InSettings);
 #else
 	Mesh->NaniteSettings = InSettings;
 #endif
 }
 
-/** Per-component Nanite opt-outs. 5.5 wrapped the bitfields in accessors. */
+/** Per-component Nanite opt-outs. The accessors are not in 5.5.4; gated with
+ *  the static mesh pair above. */
 inline bool MCPIsDisallowNanite(const UStaticMeshComponent* Component)
 {
 	if (!Component) return false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_7_API
 	return Component->IsDisallowNanite();
 #else
 	return Component->bDisallowNanite != 0;
@@ -83,7 +87,7 @@ inline bool MCPIsDisallowNanite(const UStaticMeshComponent* Component)
 inline bool MCPIsForceDisableNanite(const UStaticMeshComponent* Component)
 {
 	if (!Component) return false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_7_API
 	return Component->IsForceDisableNanite();
 #else
 	return Component->bForceDisableNanite != 0;

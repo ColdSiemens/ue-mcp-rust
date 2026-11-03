@@ -2,6 +2,7 @@
 // cached results keep the removed edge until something else invalidates them.
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "HandlerEngineVersion.h"
 #include "HandlerRegistry.h"
 #include "Handlers/PCG/PCGHandlers.h"
 #include "Dom/JsonObject.h"
@@ -30,10 +31,20 @@ bool FMCPPCGDisconnectNotifiesTest::RunTest(const FString& Parameters)
 	UPCGGraph* Graph = NewObject<UPCGGraph>(Package, TEXT("PG_DisconnectProbe"), RF_Public | RF_Standalone | RF_Transactional);
 	if (!TestNotNull(TEXT("PCG graph fixture created"), Graph)) return false;
 
+#if UE_MCP_HAS_5_8_API
 	UPCGAddTagSettings* FromSettings = nullptr;
 	UPCGAddTagSettings* ToSettings = nullptr;
 	UPCGNode* From = Graph->AddNodeOfType(FromSettings);
 	UPCGNode* To = Graph->AddNodeOfType(ToSettings);
+#else
+	// UPCGAddTagSettings has no PCG_API before 5.8 (checked against 5.5.4), so
+	// the templated AddNodeOfType, which calls its StaticClass(), does not link.
+	UClass* const AddTagClass = FindObject<UClass>(nullptr, TEXT("/Script/PCG.PCGAddTagSettings"));
+	UPCGSettings* FromSettings = nullptr;
+	UPCGSettings* ToSettings = nullptr;
+	UPCGNode* From = Graph->AddNodeOfType(AddTagClass, FromSettings);
+	UPCGNode* To = Graph->AddNodeOfType(AddTagClass, ToSettings);
+#endif
 	if (!TestTrue(TEXT("two nodes added"), From && To)) return false;
 	if (!TestNotNull(TEXT("edge added"), Graph->AddEdge(From, PCGPinConstants::DefaultOutputLabel, To, PCGPinConstants::DefaultInputLabel))) return false;
 

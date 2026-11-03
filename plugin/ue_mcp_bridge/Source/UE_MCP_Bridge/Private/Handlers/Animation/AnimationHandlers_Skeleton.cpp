@@ -660,14 +660,15 @@ static TArray<FString> SkeletonBoneNames(const USkeleton* Skeleton)
 
 // ── Curve metadata flags ─────────────────────────────────────────────────────
 //
-// 5.5 added the named accessors (GetCurveMetaDataMaterial and friends). On 5.4
-// the same two bits live in FCurveMetaData::Type, reached through the mutable
-// GetCurveMetaData, so the flags read and write the same asset data either way.
+// The named accessors (GetCurveMetaDataMaterial and friends) are not in 5.5.4
+// and are in 5.8; the same two bits live in FCurveMetaData::Type on every
+// version, reached through the mutable GetCurveMetaData, so that path serves
+// everything before 5.8 and the flags read and write the same asset data.
 
 static bool MCPGetCurveFlagMaterial(const USkeleton* Skeleton, FName CurveName)
 {
 	if (!Skeleton) return false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	return Skeleton->GetCurveMetaDataMaterial(CurveName);
 #else
 	const FCurveMetaData* MetaData = Skeleton->GetCurveMetaData(CurveName);
@@ -678,7 +679,7 @@ static bool MCPGetCurveFlagMaterial(const USkeleton* Skeleton, FName CurveName)
 static bool MCPGetCurveFlagMorphTarget(const USkeleton* Skeleton, FName CurveName)
 {
 	if (!Skeleton) return false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	return Skeleton->GetCurveMetaDataMorphTarget(CurveName);
 #else
 	const FCurveMetaData* MetaData = Skeleton->GetCurveMetaData(CurveName);
@@ -689,7 +690,7 @@ static bool MCPGetCurveFlagMorphTarget(const USkeleton* Skeleton, FName CurveNam
 static void MCPSetCurveFlagMaterial(USkeleton* Skeleton, FName CurveName, bool bValue)
 {
 	if (!Skeleton) return;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	Skeleton->SetCurveMetaDataMaterial(CurveName, bValue);
 #else
 	if (FCurveMetaData* MetaData = Skeleton->GetCurveMetaData(CurveName))
@@ -703,7 +704,7 @@ static void MCPSetCurveFlagMaterial(USkeleton* Skeleton, FName CurveName, bool b
 static void MCPSetCurveFlagMorphTarget(USkeleton* Skeleton, FName CurveName, bool bValue)
 {
 	if (!Skeleton) return;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	Skeleton->SetCurveMetaDataMorphTarget(CurveName, bValue);
 #else
 	if (FCurveMetaData* MetaData = Skeleton->GetCurveMetaData(CurveName))

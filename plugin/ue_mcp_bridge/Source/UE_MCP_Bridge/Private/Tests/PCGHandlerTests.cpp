@@ -273,9 +273,17 @@ bool FMCPPCGImportWarningsTest::RunTest(const FString& Parameters)
 	FString SaveError;
 	if (!TestTrue(TEXT("child graph saves"), SaveAssetPackageChecked(Child, SaveError))) return false;
 	UPCGSubgraphSettings* FromSettings = nullptr;
-	UPCGAddTagSettings* ToSettings = nullptr;
 	UPCGNode* From = Graph->AddNodeOfType(FromSettings);
+#if UE_MCP_HAS_5_8_API
+	UPCGAddTagSettings* ToSettings = nullptr;
 	UPCGNode* To = Graph->AddNodeOfType(ToSettings);
+#else
+	// UPCGAddTagSettings has no PCG_API before 5.8 (checked against 5.5.4), so
+	// the templated AddNodeOfType, which calls its StaticClass(), does not link.
+	UPCGSettings* ToSettings = nullptr;
+	UPCGNode* To = Graph->AddNodeOfType(
+		FindObject<UClass>(nullptr, TEXT("/Script/PCG.PCGAddTagSettings")), ToSettings);
+#endif
 	if (!TestTrue(TEXT("two nodes added"), From && To)) return false;
 	FromSettings->SetSubgraph(Child);
 	From->UpdateAfterSettingsChangeDuringCreation();

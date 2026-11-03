@@ -60,10 +60,11 @@ namespace
 		return NewObject<UFactory>(GetTransientPackage(), FactoryClass);
 	}
 
-#if !UE_MCP_HAS_5_5_API
+#if !UE_MCP_HAS_5_8_API
 	/** One user parameter off a component's override store.
 	 *
-	 *  5.5 added the UNiagaraComponent::GetVariable* getters. On 5.4 only the
+	 *  The UNiagaraComponent::GetVariable* getters are in 5.8 and not in 5.5.4
+	 *  (5.6/5.7 not checked). Before that only the
 	 *  setters exist, so the previous value is read straight out of the store
 	 *  those setters write into. CopyParameterData is used rather than a raw
 	 *  offset read because it is the call that converts a stored LWC struct
@@ -960,7 +961,7 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::SetNiagaraParameter(const TSharedPtr<FJ
 			return MCPError(TEXT("Missing 'value' parameter for float type"));
 		}
 		bool bIsValid = false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		const float PreviousFloat = NiagaraComp->GetVariableFloat(ParamFName, bIsValid);
 #else
 		float PreviousFloatRead = 0.f;
@@ -986,7 +987,7 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::SetNiagaraParameter(const TSharedPtr<FJ
 		TryGetNumberParam(Params, TEXT("valueZ"), VZ);
 		FVector VecValue(VX, VY, VZ);
 		bool bIsValid = false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		const FVector PreviousVec = NiagaraComp->GetVariableVec3(ParamFName, bIsValid);
 #else
 		FVector3f PreviousVecRead(0.f);
@@ -1014,7 +1015,7 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::SetNiagaraParameter(const TSharedPtr<FJ
 	{
 		bool bValue = OptionalBool(Params, TEXT("value"), false);
 		bool bIsValid = false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		const bool bPreviousBool = NiagaraComp->GetVariableBool(ParamFName, bIsValid);
 #else
 		FNiagaraBool PreviousBoolRead;
@@ -1036,7 +1037,7 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::SetNiagaraParameter(const TSharedPtr<FJ
 	{
 		double IntValue = OptionalNumber(Params, TEXT("value"), 0.0);
 		bool bIsValid = false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		const int32 PreviousInt = NiagaraComp->GetVariableInt(ParamFName, bIsValid);
 #else
 		int32 PreviousIntRead = 0;
@@ -2001,12 +2002,12 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::ListModuleInputs(const TSharedPtr<FJson
 	FString StackContext = OptionalString(Params, TEXT("stackContext"), TEXT("all"));
 	FString ModuleFilter = OptionalString(Params, TEXT("moduleName"), TEXT(""));
 
-#if !UE_MCP_HAS_5_5_API
+#if !UE_MCP_HAS_5_8_API
 	(void)EmitterIndex;
 	// FNiagaraStackGraphUtilities::GetStackFunctionInputs and
-	// FNiagaraStackFunctionInputBinder are declared but not exported in 5.4, and no reflected API stands in for them.
-	return MCPUnsupportedEngineError(TEXT("Niagara module input editing"), TEXT("5.5"),
-		TEXT("The NiagaraEditor stack API it reads and writes through is not exported in 5.4."));
+	// FNiagaraStackFunctionInputBinder are declared without NIAGARAEDITOR_API before 5.8 (checked against 5.5.4), and no reflected API stands in for them.
+	return MCPUnsupportedEngineError(TEXT("Niagara module input editing"), TEXT("5.8"),
+		TEXT("The NiagaraEditor stack API it reads and writes through is not exported before 5.8."));
 #else
 
 	REQUIRE_ASSET(UNiagaraSystem, System, SystemPath);
@@ -2274,12 +2275,12 @@ TSharedPtr<FJsonValue> FNiagaraHandlers::SetModuleInput(const TSharedPtr<FJsonOb
 	FString Value;
 	if (auto Err = NiagaraModuleInputValueText(Params, Value)) return Err;
 
-#if !UE_MCP_HAS_5_5_API
+#if !UE_MCP_HAS_5_8_API
 	(void)EmitterIndex;
 	// FNiagaraStackGraphUtilities::GetStackFunctionInputs and
-	// FNiagaraStackFunctionInputBinder are declared but not exported in 5.4, and no reflected API stands in for them.
-	return MCPUnsupportedEngineError(TEXT("Niagara module input editing"), TEXT("5.5"),
-		TEXT("The NiagaraEditor stack API it reads and writes through is not exported in 5.4."));
+	// FNiagaraStackFunctionInputBinder are declared without NIAGARAEDITOR_API before 5.8 (checked against 5.5.4), and no reflected API stands in for them.
+	return MCPUnsupportedEngineError(TEXT("Niagara module input editing"), TEXT("5.8"),
+		TEXT("The NiagaraEditor stack API it reads and writes through is not exported before 5.8."));
 #else
 
 	REQUIRE_ASSET(UNiagaraSystem, System, SystemPath);

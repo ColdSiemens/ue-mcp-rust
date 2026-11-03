@@ -135,12 +135,12 @@ namespace
 
 	/** The RuntimeVirtualTextureOutput material expression class.
 	 *
-	 *  5.4 declares UMaterialExpressionRuntimeVirtualTextureOutput without an
+	 *  Before 5.8 (checked against 5.4 and 5.5.4) UMaterialExpressionRuntimeVirtualTextureOutput has no
 	 *  ENGINE_API, so its StaticClass() does not link outside Engine. The class
 	 *  is registered like any other, so it is resolved by path there. */
 	UClass* MCPRvtOutputExpressionClass()
 	{
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		return UMaterialExpressionRuntimeVirtualTextureOutput::StaticClass();
 #else
 		return FindObject<UClass>(

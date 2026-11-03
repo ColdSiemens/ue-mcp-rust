@@ -178,7 +178,13 @@ TSharedPtr<FJsonValue> FPCGHandlers::SetGraphParameters(const TSharedPtr<FJsonOb
 			const UPropertyBag* BagStruct = Bag.GetPropertyBagStruct();
 			const FPropertyBagPropertyDesc* Desc = BagStruct ? BagStruct->FindPropertyDescByName(Entry.Name) : nullptr;
 			const bool bRetype = Entry.bHasType && (!Desc || Desc->ValueType != Entry.Type.Type || Desc->ValueTypeObject != Entry.Type.TypeObject);
+#if UE_MCP_HAS_5_8_API
 			if (bRetype) Bag.AddProperty(Entry.Name, Entry.Type.Type, Entry.Type.TypeObject, /*bOverwrite*/ true);
+#else
+			// 5.5.4's AddProperty has no bOverwrite parameter (5.8 does); it
+			// always replaces a property of the same name.
+			if (bRetype) Bag.AddProperty(Entry.Name, Entry.Type.Type, Entry.Type.TypeObject);
+#endif
 			if (!Entry.Default.IsValid()) continue;
 			BagStruct = Bag.GetPropertyBagStruct();
 			Desc = BagStruct ? BagStruct->FindPropertyDescByName(Entry.Name) : nullptr;

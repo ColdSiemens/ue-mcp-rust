@@ -66,6 +66,9 @@
 #include "ProfilingDebugging/TraceAuxiliary.h"
 #include "RenderTimer.h"
 #include "Trace/Trace.h"
+#if !UE_MCP_HAS_5_8_API
+#include "DynamicRHI.h"
+#endif
 
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
@@ -220,8 +223,8 @@ namespace
 		{
 		case FTraceAuxiliary::EConnectionType::Network:       return TEXT("network");
 		case FTraceAuxiliary::EConnectionType::File:          return TEXT("file");
-#if UE_MCP_HAS_5_5_API
-		// Relay tracing is a 5.5 addition to the enum.
+#if UE_MCP_HAS_5_8_API
+		// Relay is not in 5.5.4's EConnectionType; it is in 5.8.
 		case FTraceAuxiliary::EConnectionType::Relay:         return TEXT("relay");
 #endif
 #if UE_MCP_HAS_5_8_API
@@ -253,7 +256,10 @@ namespace
 		// Same 5.8 addition, mirrored in the system-status enum.
 		case FTraceAuxiliary::ETraceSystemStatus::TracingToSecureNetwork: return TEXT("tracingToSecureNetwork");
 #endif
+#if UE_MCP_HAS_5_8_API
+		// TracingToCustomRelay is not in 5.5.4's ETraceSystemStatus; it is in 5.8.
 		case FTraceAuxiliary::ETraceSystemStatus::TracingToCustomRelay:   return TEXT("tracingToCustomRelay");
+#endif
 		default:                                                          return TEXT("unknown");
 		}
 #else
@@ -354,10 +360,10 @@ namespace
 		TSharedPtr<FJsonObject> StatsObj = MakeShared<FJsonObject>();
 		StatsObj->SetNumberField(TEXT("bytesSent"), static_cast<double>(Stats.BytesSent));
 		StatsObj->SetNumberField(TEXT("bytesTraced"), static_cast<double>(Stats.BytesTraced));
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		StatsObj->SetNumberField(TEXT("bytesEmitted"), static_cast<double>(Stats.BytesEmitted));
 #else
-		// UE::Trace::FStatistics gained BytesEmitted in 5.5.
+		// UE::Trace::FStatistics has no BytesEmitted in 5.5.4; it is in 5.8.
 #endif
 		StatsObj->SetNumberField(TEXT("memoryUsed"), static_cast<double>(Stats.MemoryUsed));
 		StatsObj->SetNumberField(TEXT("cacheAllocated"), static_cast<double>(Stats.CacheAllocated));
@@ -505,7 +511,7 @@ namespace
 	FMCPProfilingGpuSamples MCPProfilingDrainGpuHistory()
 	{
 		FMCPProfilingGpuSamples Out;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		static FRHIGPUFrameTimeHistory::FState CursorState;
 
 		double Total = 0.0;
@@ -527,13 +533,16 @@ namespace
 		}
 		if (Out.Count > 0) Out.AvgMs = Total / static_cast<double>(Out.Count);
 #else
-		// 5.4 has no FRHIGPUFrameTimeHistory: the RHI publishes only the most
-		// recent GPU frame, in GGPUFrameTime cycles. One sample is what there
+		// FRHIGPUFrameTimeHistory is not in 5.5.4 (it is in 5.8): the RHI
+		// publishes only the most recent GPU frame. One sample is what there
 		// is to report, so min, max and average are that sample, and a count of
-		// one says so rather than implying a drained ring.
-		if (GGPUFrameTime > 0)
+		// one says so rather than implying a drained ring. RHIGetGPUFrameCycles
+		// is read rather than GGPUFrameTime, which 5.8 no longer has, so this
+		// branch also builds on the 5.6/5.7 engines the gate cannot tell apart.
+		const uint32 GpuFrameCycles = GDynamicRHI ? RHIGetGPUFrameCycles() : 0;
+		if (GpuFrameCycles > 0)
 		{
-			const double Ms = MCPProfilingCycles64ToMs(static_cast<uint64>(GGPUFrameTime));
+			const double Ms = MCPProfilingCycles64ToMs(static_cast<uint64>(GpuFrameCycles));
 			Out.MinMs = Ms;
 			Out.MaxMs = Ms;
 			Out.AvgMs = Ms;
@@ -970,14 +979,15 @@ TSharedPtr<FJsonValue> FEditorHandlers::SetTraceChannels(const TSharedPtr<FJsonO
 		{
 			const FMCPProfilingChannelRow* Row = FindRow(Name);
 			const bool bBefore = Row ? Row->bEnabled : false;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 			if (bWantEnabled) FTraceAuxiliary::EnableChannels(*Name);
 			else              FTraceAuxiliary::DisableChannels(*Name);
 #else
-			// 5.4's EnableChannels takes no channel list, so the ToggleChannel
-			// call below is the only apply on that engine. DisableChannels does
-			// take one and is kept, so a disable still goes through the same
-			// path it does everywhere else.
+			// EnableChannels takes no channel-name string in 5.5.4 (only ids;
+			// the string overload is in 5.8), so the ToggleChannel call below is
+			// the only apply on that engine. DisableChannels does take one and
+			// is kept, so a disable still goes through the same path it does
+			// everywhere else.
 			if (!bWantEnabled) FTraceAuxiliary::DisableChannels(*Name);
 #endif
 

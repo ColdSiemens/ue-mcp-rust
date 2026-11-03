@@ -180,8 +180,13 @@ namespace
 		EMetaSoundBuilderResult R = EMetaSoundBuilderResult::Failed;
 		FName DataType;
 
+#if UE_MCP_HAS_5_8_API
 		B.FindGraphInputNode(SourceInterface::Inputs::OnPlay, DataType, Session.OnPlay, R);
 		B.FindGraphOutputNode(SourceOneShotInterface::Outputs::OnFinished, DataType, Session.OnFinished, R);
+#else
+		MCPAudio::MetaSoundFindGraphInputNode(B, SourceInterface::Inputs::OnPlay, DataType, Session.OnPlay, R);
+		MCPAudio::MetaSoundFindGraphOutputNode(B, SourceOneShotInterface::Outputs::OnFinished, DataType, Session.OnFinished, R);
+#endif
 
 		Session.AudioOuts.Reset();
 		Session.AudioOutNames.Reset();
@@ -190,7 +195,11 @@ namespace
 			for (const Metasound::FVertexName& VertexName : FormatInfo->Value.OutputVertexChannelOrder)
 			{
 				FMetaSoundBuilderNodeInputHandle Handle;
+#if UE_MCP_HAS_5_8_API
 				B.FindGraphOutputNode(VertexName, DataType, Handle, R);
+#else
+				MCPAudio::MetaSoundFindGraphOutputNode(B, VertexName, DataType, Handle, R);
+#endif
 				if (Ok(R))
 				{
 					Session.AudioOuts.Add(Handle);
@@ -635,7 +644,11 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundAuthor(const TSharedPtr<FJsonObj
 		FString Head, Tail; SplitEndpoint(Ep, Head, Tail);
 		if (Head == TEXT("input"))
 		{
+#if UE_MCP_HAS_5_8_API
 			FName DT; FMetaSoundNodeHandle N = B->FindGraphInputNode(FName(*Tail), DT, Out, R);
+#else
+			FName DT; FMetaSoundNodeHandle N = MCPAudio::MetaSoundFindGraphInputNode(*B, FName(*Tail), DT, Out, R);
+#endif
 			return Ok(R);
 		}
 		FMetaSoundNodeHandle* N = NodeMap.Find(Head);
@@ -648,7 +661,11 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundAuthor(const TSharedPtr<FJsonObj
 		FString Head, Tail; SplitEndpoint(Ep, Head, Tail);
 		if (Head == TEXT("output"))
 		{
+#if UE_MCP_HAS_5_8_API
 			FName DT; FMetaSoundNodeHandle N = B->FindGraphOutputNode(FName(*Tail), DT, In, R);
+#else
+			FName DT; FMetaSoundNodeHandle N = MCPAudio::MetaSoundFindGraphOutputNode(*B, FName(*Tail), DT, In, R);
+#endif
 			return Ok(R);
 		}
 		if (Head == TEXT("audioOut"))
@@ -867,7 +884,14 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundConnectGraphInput(const TSharedP
 	if (!S) return MSAuthorNoSessionError(AssetPath);
 
 	EMetaSoundBuilderResult R = EMetaSoundBuilderResult::Failed;
+#if UE_MCP_HAS_5_8_API
 	S->Builder->ConnectGraphInputToNode(FName(*GraphInput), NodeFromId(ToNodeId), FName(*ToInput), R);
+#else
+	// ConnectGraphInputToNode is not in 5.5.4; it is in 5.8, where it is these
+	// two calls.
+	const FMetaSoundBuilderNodeInputHandle In = S->Builder->FindNodeInputByName(NodeFromId(ToNodeId), FName(*ToInput), R);
+	if (Ok(R)) S->Builder->ConnectNodeInputToGraphInput(FName(*GraphInput), In, R);
+#endif
 	if (!Ok(R)) return MCPError(TEXT("Failed to connect graph input to node."));
 
 	auto Res = MCPSuccess();
@@ -898,7 +922,14 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundConnectGraphOutput(const TShared
 	if (!S) return MSAuthorNoSessionError(AssetPath);
 
 	EMetaSoundBuilderResult R = EMetaSoundBuilderResult::Failed;
+#if UE_MCP_HAS_5_8_API
 	S->Builder->ConnectNodeToGraphOutput(NodeFromId(FromNodeId), FName(*FromOutput), FName(*GraphOutput), R);
+#else
+	// ConnectNodeToGraphOutput is not in 5.5.4; it is in 5.8, where it is these
+	// two calls.
+	const FMetaSoundBuilderNodeOutputHandle Out = S->Builder->FindNodeOutputByName(NodeFromId(FromNodeId), FName(*FromOutput), R);
+	if (Ok(R)) S->Builder->ConnectNodeOutputToGraphOutput(FName(*GraphOutput), Out, R);
+#endif
 	if (!Ok(R)) return MCPError(TEXT("Failed to connect node output to graph output."));
 
 	auto Res = MCPSuccess();
@@ -1001,7 +1032,11 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundSetInputDefault(const TSharedPtr
 	if (!GraphInput.IsEmpty())
 	{
 		EMetaSoundBuilderResult PrevResult = EMetaSoundBuilderResult::Failed;
+#if UE_MCP_HAS_5_8_API
 		const FMetasoundFrontendLiteral Previous = S->Builder->GetGraphInputDefault(FName(*GraphInput), PrevResult);
+#else
+		const FMetasoundFrontendLiteral Previous = MCPAudio::MetaSoundGraphInputDefault(*S->Builder, FName(*GraphInput), PrevResult);
+#endif
 		TSharedPtr<FJsonValue> PrevValue;
 		FString PrevHint;
 		if (Ok(PrevResult) && MSAuthorLiteralToJson(Previous, PrevValue, PrevHint))

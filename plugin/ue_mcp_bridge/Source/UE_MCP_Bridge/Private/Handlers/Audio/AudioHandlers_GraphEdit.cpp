@@ -571,12 +571,20 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundDisconnect(const TSharedPtr<FJso
 	if (bHasGraphOutput)
 	{
 		FName DataType;
+#if UE_MCP_HAS_5_8_API
 		Target.Builder->FindGraphOutputNode(FName(*GraphOutput), DataType, InputHandle, R);
+#else
+		MCPAudio::MetaSoundFindGraphOutputNode(*Target.Builder, FName(*GraphOutput), DataType, InputHandle, R);
+#endif
 		if (!MSEditOk(R))
 		{
 			TArray<FString> Names;
 			EMetaSoundBuilderResult NamesResult = EMetaSoundBuilderResult::Failed;
+#if UE_MCP_HAS_5_8_API
 			for (const FName& Name : Target.Builder->GetGraphOutputNames(NamesResult))
+#else
+			for (const FName& Name : MCPAudio::MetaSoundGraphOutputNames(*Target.Builder, NamesResult))
+#endif
 			{
 				Names.Add(Name.ToString());
 			}
@@ -731,6 +739,15 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundRemoveMember(const TSharedPtr<FJ
 			TEXT("memberKind '%s' is not valid. Use 'input' (the inverse of metasound_add_input), 'output' (the inverse of metasound_add_output), or 'variable'."),
 			*MemberKind));
 	}
+#if !UE_MCP_HAS_5_8_API
+	// UMetaSoundBuilderBase::RemoveGraphVariable is not in 5.5.4, whose builders
+	// have no variable removal at all; it is in 5.8.
+	if (Kind == TEXT("variable"))
+	{
+		return MCPUnsupportedEngineError(TEXT("audio(metasound_remove_member) with memberKind 'variable'"), TEXT("5.8"),
+			TEXT("This engine's MetaSound builder cannot remove a graph variable. Inputs and outputs can still be removed."));
+	}
+#endif
 
 	FMSEditTarget Target;
 	TSharedPtr<FJsonValue> Error;
@@ -749,7 +766,11 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundRemoveMember(const TSharedPtr<FJ
 	if (Kind == TEXT("input"))
 	{
 		EMetaSoundBuilderResult NamesResult = EMetaSoundBuilderResult::Failed;
+#if UE_MCP_HAS_5_8_API
 		for (const FName& Existing : Target.Builder->GetGraphInputNames(NamesResult))
+#else
+		for (const FName& Existing : MCPAudio::MetaSoundGraphInputNames(*Target.Builder, NamesResult))
+#endif
 		{
 			Known.Add(Existing.ToString());
 			if (Existing == FName(*Name)) bPresent = true;
@@ -758,14 +779,22 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundRemoveMember(const TSharedPtr<FJ
 		{
 			FName TypeName;
 			FMetaSoundBuilderNodeOutputHandle Handle;
+#if UE_MCP_HAS_5_8_API
 			Target.Builder->FindGraphInputNode(FName(*Name), TypeName, Handle, R);
+#else
+			MCPAudio::MetaSoundFindGraphInputNode(*Target.Builder, FName(*Name), TypeName, Handle, R);
+#endif
 			if (MSEditOk(R)) DataType = TypeName.ToString();
 		}
 	}
 	else if (Kind == TEXT("output"))
 	{
 		EMetaSoundBuilderResult NamesResult = EMetaSoundBuilderResult::Failed;
+#if UE_MCP_HAS_5_8_API
 		for (const FName& Existing : Target.Builder->GetGraphOutputNames(NamesResult))
+#else
+		for (const FName& Existing : MCPAudio::MetaSoundGraphOutputNames(*Target.Builder, NamesResult))
+#endif
 		{
 			Known.Add(Existing.ToString());
 			if (Existing == FName(*Name)) bPresent = true;
@@ -774,7 +803,11 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundRemoveMember(const TSharedPtr<FJ
 		{
 			FName TypeName;
 			FMetaSoundBuilderNodeInputHandle Handle;
+#if UE_MCP_HAS_5_8_API
 			Target.Builder->FindGraphOutputNode(FName(*Name), TypeName, Handle, R);
+#else
+			MCPAudio::MetaSoundFindGraphOutputNode(*Target.Builder, FName(*Name), TypeName, Handle, R);
+#endif
 			if (MSEditOk(R)) DataType = TypeName.ToString();
 		}
 	}
@@ -824,7 +857,9 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundRemoveMember(const TSharedPtr<FJ
 	R = EMetaSoundBuilderResult::Failed;
 	if (Kind == TEXT("input")) Target.Builder->RemoveGraphInput(FName(*Name), R);
 	else if (Kind == TEXT("output")) Target.Builder->RemoveGraphOutput(FName(*Name), R);
+#if UE_MCP_HAS_5_8_API
 	else Target.Builder->RemoveGraphVariable(FName(*Name), R);
+#endif
 
 	if (!MSEditOk(R))
 	{
@@ -903,8 +938,13 @@ TSharedPtr<FJsonValue> FAudioHandlers::MetaSoundRenameMember(const TSharedPtr<FJ
 	// nothing.
 	EMetaSoundBuilderResult NamesResult = EMetaSoundBuilderResult::Failed;
 	TArray<FName> Existing = (Kind == TEXT("input"))
+#if UE_MCP_HAS_5_8_API
 		? Target.Builder->GetGraphInputNames(NamesResult)
 		: Target.Builder->GetGraphOutputNames(NamesResult);
+#else
+		? MCPAudio::MetaSoundGraphInputNames(*Target.Builder, NamesResult)
+		: MCPAudio::MetaSoundGraphOutputNames(*Target.Builder, NamesResult);
+#endif
 
 	TArray<FString> Known;
 	bool bHasSource = false;
@@ -1540,12 +1580,13 @@ TSharedPtr<FJsonValue> FAudioHandlers::ReadSoundRouting(const TSharedPtr<FJsonOb
 		// other: `maxCount` keeps meaning the authored field, and
 		// `effectiveMaxCount` is what the voice limiter actually applies.
 		const int32 AuthoredMaxCount = Conc->Concurrency.MaxCount;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		const int32 EffectiveMaxCount = Conc->Concurrency.GetMaxCount();
 		const bool bPlatformScaled = Conc->Concurrency.IsMaxCountPlatformScalingEnabled();
 #else
-		// 5.4 has no platform scaling on concurrency and no accessor pair: the
-		// authored count is the one the voice limiter applies.
+		// 5.4 and 5.5.4 have no platform scaling on concurrency and no accessor
+		// pair (5.8 has both): the authored count is the one the voice limiter
+		// applies.
 		const int32 EffectiveMaxCount = AuthoredMaxCount;
 		const bool bPlatformScaled = false;
 #endif

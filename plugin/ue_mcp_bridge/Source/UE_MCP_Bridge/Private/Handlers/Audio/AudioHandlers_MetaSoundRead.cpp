@@ -487,7 +487,13 @@ namespace
 		const FName InputName,
 		const FGuid& PageID)
 	{
+#if UE_MCP_HAS_5_6_API
 		for (const FMetasoundFrontendClassInput& In : Doc.RootGraph.GetDefaultInterface().Inputs)
+#else
+		// GetDefaultInterface is not in 5.5.4; 5.8 marks the member it replaced
+		// deprecated at 5.6.
+		for (const FMetasoundFrontendClassInput& In : MCPAudio::MetaSoundRootInterface(Doc.RootGraph).Inputs)
+#endif
 		{
 			if (In.Name != InputName) continue;
 			if (const FMetasoundFrontendLiteral* Lit = In.FindConstDefault(PageID))

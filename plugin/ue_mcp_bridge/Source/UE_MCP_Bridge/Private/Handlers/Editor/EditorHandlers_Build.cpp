@@ -330,11 +330,12 @@ TSharedPtr<FJsonValue> FEditorHandlers::ValidateAssets(const TSharedPtr<FJsonObj
 	Result->SetNumberField(TEXT("skipped"), ValidationResults.NumSkipped);
 	Result->SetNumberField(TEXT("warnings"), ValidationResults.NumWarnings);
 	Result->SetNumberField(TEXT("unableToValidate"), ValidationResults.NumUnableToValidate);
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	Result->SetNumberField(TEXT("externalObjects"), ValidationResults.NumExternalObjects);
 #else
-	// 5.4 does not count external objects separately, and reporting a zero it
-	// never measured would read as "none found" rather than "not measured".
+	// FValidateAssetsResults has no NumExternalObjects in 5.5.4 (it is in 5.8),
+	// and reporting a zero it never measured would read as "none found" rather
+	// than "not measured".
 #endif
 	Result->SetBoolField(TEXT("assetLimitReached"), ValidationResults.bAssetLimitReached);
 	const FString OverallResult = ValidationResults.NumInvalid > 0

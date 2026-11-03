@@ -620,9 +620,12 @@ TSharedPtr<FJsonValue> FStateTreeHandlers::ListStateTreeNodeTypes(const TSharedP
 		SchemaObj->SetBoolField(TEXT("allowUtilityConsiderations"), Schema->AllowUtilityConsiderations());
 		SchemaObj->SetBoolField(TEXT("allowEvaluators"), Schema->AllowEvaluators());
 		SchemaObj->SetBoolField(TEXT("allowMultipleTasks"), Schema->AllowMultipleTasks());
+#if UE_MCP_HAS_5_8_API
+		// These three schema queries are in 5.8 and not in 5.5.4; 5.6/5.7 not checked.
 		SchemaObj->SetBoolField(TEXT("allowGlobalParameters"), Schema->AllowGlobalParameters());
 		SchemaObj->SetBoolField(TEXT("allowTasksCompletion"), Schema->AllowTasksCompletion());
 		SchemaObj->SetBoolField(TEXT("scheduledTickAllowed"), Schema->IsScheduledTickAllowed());
+#endif
 
 		TArray<TSharedPtr<FJsonValue>> ContextData;
 		for (const FStateTreeExternalDataDesc& Desc : Schema->GetContextDataDescs())
@@ -768,12 +771,17 @@ TSharedPtr<FJsonValue> FStateTreeHandlers::ReadState(const TSharedPtr<FJsonObjec
 	Result->SetStringField(TEXT("selectionBehavior"), StaticEnum<EStateTreeStateSelectionBehavior>()
 		? StaticEnum<EStateTreeStateSelectionBehavior>()->GetNameStringByValue(static_cast<int64>(State->SelectionBehavior))
 		: FString());
+#if UE_MCP_HAS_5_8_API
+	// UStateTreeState::TasksCompletion and its enum are in 5.8 and not in 5.5.4; 5.6/5.7 not checked.
 	Result->SetStringField(TEXT("tasksCompletion"), StaticEnum<EStateTreeTaskCompletionType>()
 		? StaticEnum<EStateTreeTaskCompletionType>()->GetNameStringByValue(static_cast<int64>(State->TasksCompletion))
 		: FString());
+#endif
 	Result->SetBoolField(TEXT("bEnabled"), State->bEnabled);
 	Result->SetNumberField(TEXT("weight"), State->Weight);
+#if UE_MCP_HAS_STATETREE_STATE_DESCRIPTION
 	Result->SetStringField(TEXT("description"), State->Description);
+#endif
 	Result->SetStringField(TEXT("tag"), State->Tag.IsValid() ? State->Tag.ToString() : FString());
 	Result->SetStringField(TEXT("parentStateId"), State->Parent ? StateTreeDepthGuid(State->Parent->ID) : FString());
 	Result->SetNumberField(TEXT("childCount"), State->Children.Num());
@@ -1242,7 +1250,18 @@ TSharedPtr<FJsonValue> FStateTreeHandlers::SetStateLink(const TSharedPtr<FJsonOb
 		// UpdateParametersFromLinkedSubtree, which fills this state's fixed
 		// parameter layout from the subtree. Without it set_state_parameter has
 		// nothing to override.
+#if UE_MCP_HAS_5_8_API
 		State->SetLinkedState(Target->GetLinkToState());
+#else
+		// No SetLinkedState in 5.5.4 (5.8 has it; 5.6/5.7 not checked). These are
+		// the steps 5.8's SetLinkedState takes (LinkedAsset is cleared above),
+		// less UStateTreeEditingSubsystem::MarkAsModified, which 5.5.4 lacks.
+		State->LinkedSubtree = Target->GetLinkToState();
+		State->Tasks.Reset();
+		State->Parameters.bFixedLayout = true;
+		State->UpdateParametersFromLinkedSubtree();
+		State->SelectionBehavior = EStateTreeStateSelectionBehavior::TryEnterState;
+#endif
 
 		Result->SetStringField(TEXT("targetStateId"), StateTreeDepthGuid(Target->ID));
 		Result->SetStringField(TEXT("targetStatePath"), FStateTreeHandlers::StateDotPath(Target));
@@ -1755,6 +1774,14 @@ TSharedPtr<FJsonValue> FStateTreeHandlers::RequestTransition(const TSharedPtr<FJ
 		return MCPError(FString::Printf(
 			TEXT("Unknown fallback '%s'. Valid values: None (default), NextSelectableSibling."), *FallbackStr));
 	}
+#if !UE_MCP_HAS_5_8_API
+	// 5.5.4's FStateTreeTransitionRequest has no Fallback and its context has no
+	// three-argument RequestTransition (5.8 has both; 5.6/5.7 not checked).
+	if (Fallback != EStateTreeSelectionFallback::None)
+	{
+		return MCPError(TEXT("fallback=NextSelectableSibling needs a transition request that carries a fallback, which is UE 5.8 and later. On this engine omit fallback (or pass None)."));
+	}
+#endif
 
 	FStateTreeExecutionContext Context(*RT.Component, *RT.StateTree, *RT.InstanceData);
 	if (Context.GetStateTreeRunStatus() != EStateTreeRunStatus::Running)
@@ -1765,7 +1792,11 @@ TSharedPtr<FJsonValue> FStateTreeHandlers::RequestTransition(const TSharedPtr<FJ
 	}
 
 	TArray<FName> Before = Context.GetActiveStateNames();
+#if UE_MCP_HAS_5_8_API
 	Context.RequestTransition(Target, Priority, Fallback);
+#else
+	Context.RequestTransition(FStateTreeTransitionRequest(Target, Priority));
+#endif
 
 	auto Result = MCPSuccess();
 	MCPSetUpdated(Result);

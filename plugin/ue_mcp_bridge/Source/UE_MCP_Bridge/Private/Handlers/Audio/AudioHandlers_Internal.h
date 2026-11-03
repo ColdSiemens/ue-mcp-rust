@@ -11,6 +11,9 @@
 #include "Sound/SoundClass.h"
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraph/EdGraphPin.h"
+#if UE_MCP_HAS_5_5_API && !UE_MCP_HAS_5_8_API
+#include "MetasoundBuilderBase.h"
+#endif
 
 namespace MCPAudio
 {
@@ -159,4 +162,102 @@ namespace MCPAudio
 		}
 #endif
 	}
+
+#if UE_MCP_HAS_5_5_API && !UE_MCP_HAS_5_8_API
+	// ── UMetaSoundBuilderBase accessors missing before 5.8 ──────────────
+	//
+	// The 4-argument FindGraphInputNode / FindGraphOutputNode, GetGraphInputNames,
+	// GetGraphOutputNames and GetGraphInputDefault are not on the builder in
+	// 5.5.4; they are in 5.8. Each of these does what the 5.8 body does, through
+	// the frontend document builder that 5.5.4 already exposes.
+
+	/** The root graph's class interface. GetDefaultInterface is not in 5.5.4;
+	 *  5.8 deprecates the Interface member at 5.6 in its favour. */
+	inline const FMetasoundFrontendClassInterface& MetaSoundRootInterface(const FMetasoundFrontendGraphClass& RootGraph)
+	{
+#if UE_MCP_HAS_5_6_API
+		return RootGraph.GetDefaultInterface();
+#else
+		return RootGraph.Interface;
+#endif
+	}
+
+	inline FMetaSoundNodeHandle MetaSoundFindGraphInputNode(const UMetaSoundBuilderBase& B, FName InputName,
+		FName& OutDataType, FMetaSoundBuilderNodeOutputHandle& OutHandle, EMetaSoundBuilderResult& OutResult)
+	{
+		OutResult = EMetaSoundBuilderResult::Failed;
+		const FMetaSoundFrontendDocumentBuilder& Builder = B.GetConstBuilder();
+		if (!Builder.IsValid()) return FMetaSoundNodeHandle();
+		const FMetasoundFrontendNode* Node = Builder.FindGraphInputNode(InputName);
+		const FMetasoundFrontendClassInput* ClassInput = Builder.FindGraphInput(InputName);
+		if (!Node || !ClassInput || Node->Interface.Outputs.IsEmpty()) return FMetaSoundNodeHandle();
+		OutDataType = ClassInput->TypeName;
+		OutHandle.NodeID = Node->GetID();
+		OutHandle.VertexID = Node->Interface.Outputs[0].VertexID;
+		OutResult = EMetaSoundBuilderResult::Succeeded;
+		return FMetaSoundNodeHandle(Node->GetID());
+	}
+
+	inline FMetaSoundNodeHandle MetaSoundFindGraphOutputNode(const UMetaSoundBuilderBase& B, FName OutputName,
+		FName& OutDataType, FMetaSoundBuilderNodeInputHandle& OutHandle, EMetaSoundBuilderResult& OutResult)
+	{
+		OutResult = EMetaSoundBuilderResult::Failed;
+		const FMetaSoundFrontendDocumentBuilder& Builder = B.GetConstBuilder();
+		if (!Builder.IsValid()) return FMetaSoundNodeHandle();
+		const FMetasoundFrontendNode* Node = Builder.FindGraphOutputNode(OutputName);
+		const FMetasoundFrontendClassOutput* ClassOutput = Builder.FindGraphOutput(OutputName);
+		if (!Node || !ClassOutput || Node->Interface.Inputs.IsEmpty()) return FMetaSoundNodeHandle();
+		OutDataType = ClassOutput->TypeName;
+		OutHandle.NodeID = Node->GetID();
+		OutHandle.VertexID = Node->Interface.Inputs[0].VertexID;
+		OutResult = EMetaSoundBuilderResult::Succeeded;
+		return FMetaSoundNodeHandle(Node->GetID());
+	}
+
+	inline TArray<FName> MetaSoundGraphInputNames(const UMetaSoundBuilderBase& B, EMetaSoundBuilderResult& OutResult)
+	{
+		TArray<FName> Names;
+		OutResult = EMetaSoundBuilderResult::Failed;
+		const FMetaSoundFrontendDocumentBuilder& Builder = B.GetConstBuilder();
+		if (!Builder.IsValid()) return Names;
+		for (const FMetasoundFrontendClassInput& Input : MetaSoundRootInterface(Builder.GetConstDocumentChecked().RootGraph).Inputs)
+		{
+			Names.Emplace(Input.Name);
+		}
+		OutResult = EMetaSoundBuilderResult::Succeeded;
+		return Names;
+	}
+
+	inline TArray<FName> MetaSoundGraphOutputNames(const UMetaSoundBuilderBase& B, EMetaSoundBuilderResult& OutResult)
+	{
+		TArray<FName> Names;
+		OutResult = EMetaSoundBuilderResult::Failed;
+		const FMetaSoundFrontendDocumentBuilder& Builder = B.GetConstBuilder();
+		if (!Builder.IsValid()) return Names;
+		for (const FMetasoundFrontendClassOutput& Output : MetaSoundRootInterface(Builder.GetConstDocumentChecked().RootGraph).Outputs)
+		{
+			Names.Emplace(Output.Name);
+		}
+		OutResult = EMetaSoundBuilderResult::Succeeded;
+		return Names;
+	}
+
+	/** The graph input's default on the builder's build page, which is the page
+	 *  the 5.8 GetGraphInputDefault reads when no page name is passed. */
+	inline FMetasoundFrontendLiteral MetaSoundGraphInputDefault(const UMetaSoundBuilderBase& B, FName InputName, EMetaSoundBuilderResult& OutResult)
+	{
+		OutResult = EMetaSoundBuilderResult::Failed;
+		const FMetaSoundFrontendDocumentBuilder& Builder = B.GetConstBuilder();
+		if (!Builder.IsValid()) return FMetasoundFrontendLiteral();
+		if (const FMetasoundFrontendClassInput* ClassInput = Builder.FindGraphInput(InputName))
+		{
+			if (const FMetasoundFrontendLiteral* Default = ClassInput->FindConstDefault(Builder.GetBuildPageID()))
+			{
+				OutResult = EMetaSoundBuilderResult::Succeeded;
+				return *Default;
+			}
+		}
+		return FMetasoundFrontendLiteral();
+	}
+#endif
 }

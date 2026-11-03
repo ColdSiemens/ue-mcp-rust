@@ -16,12 +16,13 @@
 #include "HandlerPoseSearchSchema.h"
 #include "HandlerAnimStateGraph.h"
 #include "PoseSearch/PoseSearchFeatureChannel.h"
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 #include "PoseSearch/PoseSearchFeatureChannel_Pose.h"
 #include "PoseSearch/PoseSearchFeatureChannel_Trajectory.h"
 #else
-// UE 5.4 keeps both channel headers (and the FPoseSearchBone /
-// FPoseSearchTrajectorySample structs inside them) private to the PoseSearch
+// UE 5.4 and 5.5 (checked on 5.5.4; public in 5.8, 5.6/5.7 not checked) keep
+// both channel headers (and the FPoseSearchBone / FPoseSearchTrajectorySample
+// structs inside them) private to the PoseSearch
 // module, so nothing outside it can name the types. The classes are still
 // UCLASSes with reflected properties, so the two channel actions author them
 // through the property system instead - same asset, same fields, no header.
@@ -74,7 +75,7 @@ static int32 ParseFlagArray(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Fie
 }
 
 // Bit values of EPoseSearchBoneFlags / EPoseSearchTrajectoryFlags. They are
-// spelled out rather than taken from the enums because on 5.4 the enums are
+// spelled out rather than taken from the enums because before 5.8 the enums are
 // declared in the private channel headers; these are the values the asset
 // serializes and they are the same from 5.4 through 5.8.
 static constexpr int32 MCPBoneFlagVelocity = 1 << 0;
@@ -91,7 +92,7 @@ static constexpr int32 MCPTrajFlagPositionXY          = 1 << 5;
 static constexpr int32 MCPTrajFlagVelocityDirectionXY = 1 << 6;
 static constexpr int32 MCPTrajFlagFacingDirectionXY   = 1 << 7;
 
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 // Where the enums are reachable, hold the spelled-out values to them.
 static_assert(MCPBoneFlagVelocity == int32(EPoseSearchBoneFlags::Velocity), "EPoseSearchBoneFlags::Velocity moved");
 static_assert(MCPBoneFlagPosition == int32(EPoseSearchBoneFlags::Position), "EPoseSearchBoneFlags::Position moved");
@@ -133,9 +134,9 @@ static const TMap<FString, int32>& TrajectoryFlagTable()
 	return Table;
 }
 
-#if !UE_MCP_HAS_5_5_API
-/** Construct one of the PoseSearch channel classes by its script path. On 5.4
- *  the concrete classes are private to the PoseSearch module, but the UClass is
+#if !UE_MCP_HAS_5_8_API
+/** Construct one of the PoseSearch channel classes by its script path. Before
+ *  5.8 the concrete classes are private to the PoseSearch module, but the UClass is
  *  registered like any other, so the object is created through it. */
 static UPoseSearchFeatureChannel* MCPNewPoseSearchChannel(UPoseSearchSchema* Schema, const TCHAR* ClassPath)
 {
@@ -330,7 +331,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::AddPoseSearchSchemaPoseChannel(const 
 
 	Schema->Modify();
 
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	UPoseSearchFeatureChannel_Pose* Channel = NewObject<UPoseSearchFeatureChannel_Pose>(Schema, NAME_None, RF_Transactional);
 	if (bHasChannelWeight) Channel->Weight = (float)ChannelWeight;
 	for (const FParsedBone& Parsed : ParsedBones)
@@ -425,7 +426,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::AddPoseSearchSchemaTrajectoryChannel(
 
 	Schema->Modify();
 
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	UPoseSearchFeatureChannel_Trajectory* Channel = NewObject<UPoseSearchFeatureChannel_Trajectory>(Schema, NAME_None, RF_Transactional);
 	if (bHasChannelWeight) Channel->Weight = (float)ChannelWeight;
 	for (const FParsedSample& Parsed : ParsedSamples)
@@ -679,6 +680,15 @@ TSharedPtr<FJsonValue> FAnimationHandlers::SetPoseSearchDatabaseSettings(const T
 	UPoseSearchDatabase* Database = LoadAssetByPath<UPoseSearchDatabase>(AssetPath);
 	if (!Database) return MCPError(FString::Printf(TEXT("PoseSearchDatabase not found: %s"), *AssetPath));
 
+#if !UE_MCP_HAS_5_8_API
+	// EPoseSearchMode::EventOnly is not in 5.5.4 (5.8 has it), so refuse it
+	// rather than report a write that never happened.
+	if (bHasMode && Mode.Equals(TEXT("eventonly"), ESearchCase::IgnoreCase))
+	{
+		return MCPError(TEXT("poseSearchMode 'EventOnly' requires UE 5.8 or newer"));
+	}
+#endif
+
 	// Every field this action can write, read before any of them is touched. The
 	// action is its own inverse, so the rollback carries all of them whether or
 	// not the caller passed them.
@@ -690,7 +700,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::SetPoseSearchDatabaseSettings(const T
 	FString PrevPoseSearchModeName = TEXT("BruteForce");
 	if (PrevPoseSearchMode == EPoseSearchMode::PCAKDTree) PrevPoseSearchModeName = TEXT("PCAKDTree");
 	else if (PrevPoseSearchMode == EPoseSearchMode::VPTree) PrevPoseSearchModeName = TEXT("VPTree");
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	// EPoseSearchMode::EventOnly is a later addition to the enum.
 	else if (PrevPoseSearchMode == EPoseSearchMode::EventOnly) PrevPoseSearchModeName = TEXT("EventOnly");
 #endif
@@ -711,7 +721,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::SetPoseSearchDatabaseSettings(const T
 		if (Mode.Equals(TEXT("bruteforce"), ESearchCase::IgnoreCase)) Database->PoseSearchMode = EPoseSearchMode::BruteForce;
 		else if (Mode.Equals(TEXT("pcakdtree"), ESearchCase::IgnoreCase)) Database->PoseSearchMode = EPoseSearchMode::PCAKDTree;
 		else if (Mode.Equals(TEXT("vptree"), ESearchCase::IgnoreCase)) Database->PoseSearchMode = EPoseSearchMode::VPTree;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		else if (Mode.Equals(TEXT("eventonly"), ESearchCase::IgnoreCase)) Database->PoseSearchMode = EPoseSearchMode::EventOnly;
 #endif
 	}

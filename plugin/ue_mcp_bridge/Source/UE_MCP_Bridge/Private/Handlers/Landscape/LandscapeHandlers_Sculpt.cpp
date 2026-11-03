@@ -170,16 +170,25 @@ namespace
 		const FString WantedName = OptionalString(Params, TEXT("editLayer"));
 		const int32 WantedIndex = OptionalInt(Params, TEXT("editLayerIndex"), 0);
 
-		// 5.5 turned edit layers into ULandscapeEditLayerBase objects reached
-		// through GetEditLayersConst. 5.4 keeps them as FLandscapeLayer structs
-		// behind GetLayerCount/GetLayer. Both carry the same two things this
-		// needs: a name and the GUID the write is addressed to.
+		// 5.8 reaches edit layers as ULandscapeEditLayerBase objects through
+		// GetEditLayersConst. 5.5.4 has neither that nor GetGuid on the object:
+		// name and GUID still live on the FLandscapeLayer structs behind
+		// GetLayers (the switch is gated at 5.6, unverified). 5.4 reaches the
+		// same structs through GetLayerCount/GetLayer. All carry the same two
+		// things this needs: a name and the GUID the write is addressed to.
 		struct FMCPEditLayerRef { FString Name; FGuid Guid; };
 		TArray<FMCPEditLayerRef> Layers;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_6_API
 		for (const ULandscapeEditLayerBase* Layer : Landscape->GetEditLayersConst())
 		{
 			if (Layer) Layers.Add({ Layer->GetName().ToString(), Layer->GetGuid() });
+		}
+#elif UE_MCP_HAS_5_5_API
+		// The non-const GetLayer returns nullptr from 5.5, so the 5.4 loop
+		// below would find no layers at all.
+		for (const FLandscapeLayer& Layer : Landscape->GetLayers())
+		{
+			Layers.Add({ Layer.Name.ToString(), Layer.Guid });
 		}
 #else
 		for (int32 Index = 0; Index < static_cast<int32>(Landscape->GetLayerCount()); ++Index)
@@ -4495,7 +4504,7 @@ namespace
 			MCPLscEditLayerField(Type, Container, TEXT("WeightmapAlpha"), TEXT("weightmapAlpha"), Row);
 			Rows.Add(MakeShared<FJsonValueObject>(Row));
 		};
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_6_API
 		int32 Index = 0;
 		for (const ULandscapeEditLayerBase* Layer : Landscape->GetEditLayersConst())
 		{
@@ -4504,6 +4513,16 @@ namespace
 				AddRow(Index, Layer->GetName().ToString(), Layer->GetGuid(), Layer->GetClass(), Layer, Layer->GetClass()->GetName());
 			}
 			++Index;
+		}
+#elif UE_MCP_HAS_5_5_API
+		// 5.5.4: no GetEditLayersConst; the name, GUID and flags are still on
+		// FLandscapeLayer, which also points at the edit layer object for its class.
+		const TArrayView<const FLandscapeLayer> EditLayers = Landscape->GetLayers();
+		for (int32 Index = 0; Index < EditLayers.Num(); ++Index)
+		{
+			const FLandscapeLayer& Layer = EditLayers[Index];
+			AddRow(Index, Layer.Name.ToString(), Layer.Guid, FLandscapeLayer::StaticStruct(), &Layer,
+				Layer.EditLayer ? Layer.EditLayer->GetClass()->GetName() : FString());
 		}
 #else
 		for (int32 Index = 0; Index < static_cast<int32>(Landscape->GetLayerCount()); ++Index)

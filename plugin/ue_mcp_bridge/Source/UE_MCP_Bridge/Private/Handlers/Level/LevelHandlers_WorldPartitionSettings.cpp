@@ -636,8 +636,15 @@ TSharedPtr<FJsonValue> FLevelHandlers::AddRuntimeCellTransformer(const TSharedPt
 	// bridge rather than growing its own phrasing.
 	UClass* TransformerClass = MCPResolveClass(ClassName);
 #if UE_MCP_HAS_5_5_API
-	if (auto Err = MCPCheckClassUsable(
-		ClassName, TransformerClass, UWorldPartitionRuntimeCellTransformer::StaticClass()))
+#if UE_MCP_HAS_5_8_API
+	UClass* const TransformerBaseClass = UWorldPartitionRuntimeCellTransformer::StaticClass();
+#else
+	// 5.5.4 declares the class without ENGINE_API, so its StaticClass() does
+	// not link outside Engine before 5.8; it is registered, so resolve it by path.
+	UClass* const TransformerBaseClass = FindObject<UClass>(
+		nullptr, TEXT("/Script/Engine.WorldPartitionRuntimeCellTransformer"));
+#endif
+	if (auto Err = MCPCheckClassUsable(ClassName, TransformerClass, TransformerBaseClass))
 	{
 		return Err;
 	}

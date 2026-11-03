@@ -35,7 +35,8 @@
 // is by outer for that reason, with the walk folded in as a union rather than
 // used on its own.
 //
-// The map is editor-only data that landed in 5.5, so on 5.4 every sync reports
+// The map is editor-only data that is not in 5.5.4 (verified) and is in 5.8;
+// 5.6/5.7 are unverified, so it is gated at 5.8. Below that every sync reports
 // itself unsupported and changes nothing.
 namespace MCPWidgetGuidMap
 {
@@ -131,7 +132,7 @@ namespace MCPWidgetGuidMap
 	inline FSyncReport Sync(UWidgetBlueprint* WidgetBP)
 	{
 		FSyncReport Report;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 		{
 			if (!WidgetBP)
 			{

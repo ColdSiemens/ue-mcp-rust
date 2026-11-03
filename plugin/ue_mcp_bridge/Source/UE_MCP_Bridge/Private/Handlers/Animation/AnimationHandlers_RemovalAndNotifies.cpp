@@ -130,7 +130,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::SetStateMachineEntry(const TSharedPtr
 			TEXT("Recreate it with animation(create_state_machine)."), *SMName));
 	}
 
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API // GetOutputPin: not in 5.5.4, in 5.8
 	UEdGraphPin* EntryPin = Entry->GetOutputPin();
 #else
 	// 5.4's UAnimStateEntryNode has no GetOutputPin(); the entry node allocates

@@ -70,7 +70,9 @@
 // UPoseSearchDatabase's GetNumAnimationAssets / GetDatabaseAnimationAsset pair
 // is 5.5 and newer. 5.4 exposes the clip list as the AnimationAssets array of
 // FInstancedStruct with GetAnimationAssetBase, which is what the #else arms
-// below are written against.
+// below are written against. The unified FPoseSearchDatabaseAnimationAsset
+// clip struct is separate: 5.7+ (5.8 deprecates the per-type structs at 5.7;
+// 5.5.4 has only those), so clip authoring gates on UE_MCP_HAS_5_7_API.
 #define UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API UE_MCP_HAS_5_5_API
 
 #if UE_MCP_HAS_5_8_API
@@ -223,7 +225,7 @@ static FPoseSearchClipFlags ParsePoseSearchClipFlags(const TSharedPtr<FJsonObjec
 	return Flags;
 }
 
-#if UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API
+#if UE_MCP_HAS_5_7_API
 static void ApplyPoseSearchClipFlags(FPoseSearchDatabaseAnimationAsset& Entry, const FPoseSearchClipFlags& Flags)
 {
 #if WITH_EDITORONLY_DATA
@@ -231,6 +233,27 @@ static void ApplyPoseSearchClipFlags(FPoseSearchDatabaseAnimationAsset& Entry, c
 	if (Flags.bDisableReselection.IsSet()) Entry.bDisableReselection = Flags.bDisableReselection.GetValue();
 	if (Flags.MirrorOption.IsSet()) Entry.MirrorOption = Flags.MirrorOption.GetValue();
 	if (Flags.SamplingRange.IsSet()) Entry.SamplingRange = Flags.SamplingRange.GetValue();
+#endif
+}
+#elif UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API
+// Before 5.7 each clip type is its own struct: the shared flags sit on the base,
+// SamplingRange on each subtype (checked against 5.5.4).
+static void ApplyPoseSearchClipFlags(FInstancedStruct& Entry, const FPoseSearchClipFlags& Flags)
+{
+#if WITH_EDITORONLY_DATA
+	FPoseSearchDatabaseAnimationAssetBase* Base = Entry.GetMutablePtr<FPoseSearchDatabaseAnimationAssetBase>();
+	if (!Base) return;
+	if (Flags.bEnabled.IsSet()) Base->bEnabled = Flags.bEnabled.GetValue();
+	if (Flags.bDisableReselection.IsSet()) Base->bDisableReselection = Flags.bDisableReselection.GetValue();
+	if (Flags.MirrorOption.IsSet()) Base->MirrorOption = Flags.MirrorOption.GetValue();
+	if (Flags.SamplingRange.IsSet())
+	{
+		const FFloatInterval Range = Flags.SamplingRange.GetValue();
+		if (FPoseSearchDatabaseSequence* Sequence = Entry.GetMutablePtr<FPoseSearchDatabaseSequence>()) Sequence->SamplingRange = Range;
+		else if (FPoseSearchDatabaseBlendSpace* BlendSpace = Entry.GetMutablePtr<FPoseSearchDatabaseBlendSpace>()) BlendSpace->SamplingRange = Range;
+		else if (FPoseSearchDatabaseAnimComposite* Composite = Entry.GetMutablePtr<FPoseSearchDatabaseAnimComposite>()) Composite->SamplingRange = Range;
+		else if (FPoseSearchDatabaseAnimMontage* Montage = Entry.GetMutablePtr<FPoseSearchDatabaseAnimMontage>()) Montage->SamplingRange = Range;
+	}
 #endif
 }
 #endif
@@ -244,7 +267,7 @@ static bool AddPoseSearchAnimationAsset(UPoseSearchDatabase* Database, UObject* 
 		return false;
 	}
 
-#if UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API
+#if UE_MCP_HAS_5_7_API
 	// UE 5.7+ unified every clip type into FPoseSearchDatabaseAnimationAsset,
 	// which holds any UObject anim asset directly.
 	FPoseSearchDatabaseAnimationAsset Entry;
@@ -279,7 +302,14 @@ static bool AddPoseSearchAnimationAsset(UPoseSearchDatabase* Database, UObject* 
 		OutError = FString::Printf(TEXT("Animation asset type not supported by PoseSearch: %s"), *AnimAsset->GetClass()->GetName());
 		return false;
 	}
+#if UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API
+	// 5.5/5.6: AddAnimationAsset(FInstancedStruct) is the accessor that
+	// replaces the AnimationAssets member (deprecated at 5.4).
+	ApplyPoseSearchClipFlags(NewEntry, Flags);
+	Database->AddAnimationAsset(MoveTemp(NewEntry));
+#else
 	Database->AnimationAssets.Add(MoveTemp(NewEntry));
+#endif
 	return true;
 #endif
 }

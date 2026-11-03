@@ -148,7 +148,10 @@ namespace
 		case EDiffType::NODE_COMMENT: return TEXT("NODE_COMMENT");
 		case EDiffType::NODE_PROPERTY: return TEXT("NODE_PROPERTY");
 		case EDiffType::INFO_MESSAGE: return TEXT("INFO_MESSAGE");
+#if UE_MCP_HAS_5_8_API
+		// CUSTOM_OBJECT is not in 5.5.4's EDiffType; it is in 5.8.
 		case EDiffType::CUSTOM_OBJECT: return TEXT("CUSTOM_OBJECT");
+#endif
 		default: return TEXT("UNKNOWN");
 		}
 	}
@@ -414,8 +417,15 @@ namespace
 			R.Category = EDiffType::MODIFICATION;
 			R.Node1 = OldMat;
 			R.Node2 = NewMat;
+#if UE_MCP_HAS_5_8_API
 			R.Object1 = A;
 			R.Object2 = B;
+#else
+			// FDiffSingleResult::Object1/Object2 are non-const UObject* in 5.5.4
+			// (const in 5.8); the diff only reads them.
+			R.Object1 = const_cast<UMaterialExpression*>(A);
+			R.Object2 = const_cast<UMaterialExpression*>(B);
+#endif
 			R.DisplayString = FText::Format(NSLOCTEXT("UEMCPCheckpointDiff", "MaterialNodeChanged", "Changed Node '{0}'"), NewMat->GetNodeTitle(ENodeTitleType::ListView));
 			R.ToolTip = FText::Format(NSLOCTEXT("UEMCPCheckpointDiff", "MaterialNodeChangedTip", "Properties of '{0}' changed"), NewMat->GetNodeTitle(ENodeTitleType::ListView));
 			R.OwningObjectPath = NewGraph->GetPathName();
