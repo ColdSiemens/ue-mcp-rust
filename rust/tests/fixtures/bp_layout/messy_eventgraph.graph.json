@@ -1,0 +1,786 @@
+{
+ "success": true,
+ "path": "/Game/MCP_Layout/BP_MessyGraph",
+ "blueprintPath": "/Game/MCP_Layout/BP_MessyGraph.BP_MessyGraph",
+ "isLevelScript": false,
+ "graphName": "EventGraph",
+ "nodes": [
+  {
+   "id": "265096D84DFB034C9EDDFAB16BF2725C",
+   "class": "K2Node_Event",
+   "title": "Event BeginPlay",
+   "posX": 0,
+   "posY": 0,
+   "comment": "This node is disabled and will not be called.\nDrag off pins to build functionality.",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "FD738FE4420FE721F7BD3A9D3268FF0E",
+   "class": "K2Node_Event",
+   "title": "Event ActorBeginOverlap",
+   "posX": 0,
+   "posY": 208,
+   "comment": "This node is disabled and will not be called.\nDrag off pins to build functionality.",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "OtherActor",
+     "type": "object",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "F1E9B1A94D154EA26A6FA7854E8B593F",
+   "class": "K2Node_Event",
+   "title": "Event Tick",
+   "posX": 0,
+   "posY": 416,
+   "comment": "This node is disabled and will not be called.\nDrag off pins to build functionality.",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "DeltaSeconds",
+     "type": "real",
+     "direction": "Output",
+     "defaultValue": "0.0",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "6584C76E457D95202208E8AE54554B33",
+   "class": "K2Node_Event",
+   "title": "ReceiveBeginPlay",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "E258CEE04B2F1FBAF9B72F8C7DD3948A",
+   "class": "K2Node_Event",
+   "title": "ReceiveTick",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "C1366C2B41AB01FAC76C6FA500A29ED3",
+   "class": "K2Node_CustomEvent",
+   "title": "OnHit\nCustom Event",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "OutputDelegate",
+     "type": "delegate",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "0698567D48ADD0D4172ABDA76F37EC10",
+   "class": "K2Node_ExecutionSequence",
+   "title": "Sequence",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then_0",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then_1",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "9E8173C247AD5483F19A249B6C3215F7",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetSystemLibrary",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "Hello",
+     "connected": false
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "A2CE13464613CECAEF3DF780A8C251D4",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetSystemLibrary",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "Hello",
+     "connected": true
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "703AA6894965C1B752397F97A1DE42FD",
+   "class": "K2Node_CallFunction",
+   "title": "Print String",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetSystemLibrary",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "InString",
+     "type": "string",
+     "direction": "Input",
+     "defaultValue": "Hello",
+     "connected": false
+    },
+    {
+     "name": "bPrintToScreen",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "bPrintToLog",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": false
+    },
+    {
+     "name": "TextColor",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(R=0.000000,G=0.660000,B=1.000000,A=1.000000)",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "2.000000",
+     "connected": false
+    },
+    {
+     "name": "Key",
+     "type": "name",
+     "direction": "Input",
+     "defaultValue": "None",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "E5C0BD494E0CFE1D1160CAAEADC488F1",
+   "class": "K2Node_CallFunction",
+   "title": "Delay",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetSystemLibrary",
+     "connected": false
+    },
+    {
+     "name": "WorldContextObject",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "Duration",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "0.2",
+     "connected": false
+    },
+    {
+     "name": "LatentInfo",
+     "type": "struct",
+     "direction": "Input",
+     "defaultValue": "(Linkage=-1,UUID=-1,ExecutionFunction=\"\",CallbackTarget=None)",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "56AD44D84C743B4113499A9DDDF007AA",
+   "class": "K2Node_IfThenElse",
+   "title": "Branch",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Condition",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "true",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "else",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "864A1B7D4850106D4A4A529D52549E7A",
+   "class": "K2Node_VariableGet",
+   "title": "Get Health",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Health",
+     "type": "real",
+     "direction": "Output",
+     "defaultValue": "0.0",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "5E8B96FB4F68A468DC886A905DA298BC",
+   "class": "K2Node_CallFunction",
+   "title": "float > float",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetMathLibrary",
+     "connected": false
+    },
+    {
+     "name": "A",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "0.0",
+     "connected": true
+    },
+    {
+     "name": "B",
+     "type": "real",
+     "direction": "Input",
+     "defaultValue": "0.0",
+     "connected": false
+    },
+    {
+     "name": "ReturnValue",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "false",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "DD47A605461C733A79A291AAB6E7C5E7",
+   "class": "K2Node_VariableSet",
+   "title": "Set bIsAlive",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": false
+    },
+    {
+     "name": "bIsAlive",
+     "type": "bool",
+     "direction": "Input",
+     "defaultValue": "false",
+     "connected": false
+    },
+    {
+     "name": "Output_Get",
+     "type": "bool",
+     "direction": "Output",
+     "defaultValue": "false",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "1E5CE730474ED7E7DC110E901D4D78B8",
+   "class": "K2Node_VariableGet",
+   "title": "Get Counter",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "Counter",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "0",
+     "connected": true
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "60C2BA8D4EFB85A50CF47CBD5A5A18CA",
+   "class": "K2Node_CallFunction",
+   "title": "int + int",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetMathLibrary",
+     "connected": false
+    },
+    {
+     "name": "A",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "0",
+     "connected": true
+    },
+    {
+     "name": "B",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "1",
+     "connected": false
+    },
+    {
+     "name": "ReturnValue",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "0",
+     "connected": true
+    }
+   ]
+  },
+  {
+   "id": "41E732E94FAC9C9FA72734A1AC58A69E",
+   "class": "K2Node_VariableSet",
+   "title": "Set Counter",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "execute",
+     "type": "exec",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "then",
+     "type": "exec",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    },
+    {
+     "name": "Counter",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "0",
+     "connected": true
+    },
+    {
+     "name": "Output_Get",
+     "type": "int",
+     "direction": "Output",
+     "defaultValue": "0",
+     "connected": false
+    },
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "connected": false
+    }
+   ]
+  },
+  {
+   "id": "297480D04471F7960FF8478BF234560F",
+   "class": "K2Node_CallFunction",
+   "title": "To String (Integer)",
+   "posX": 0,
+   "posY": 0,
+   "comment": "",
+   "pins": [
+    {
+     "name": "self",
+     "type": "object",
+     "direction": "Input",
+     "defaultValue": "",
+     "defaultObject": "/Script/Engine.Default__KismetStringLibrary",
+     "connected": false
+    },
+    {
+     "name": "InInt",
+     "type": "int",
+     "direction": "Input",
+     "defaultValue": "0",
+     "connected": true
+    },
+    {
+     "name": "ReturnValue",
+     "type": "string",
+     "direction": "Output",
+     "defaultValue": "",
+     "connected": true
+    }
+   ]
+  }
+ ],
+ "nodeCount": 19,
+ "totalNodeCount": 19,
+ "offset": 0,
+ "limit": 19,
+ "hasMore": false,
+ "nextOffset": -1
+}

@@ -1,0 +1,205 @@
+{
+ "pos": {
+  "K2Node_Event_0": {
+   "x": 0,
+   "y": 0
+  },
+  "K2Node_Event_3": {
+   "x": 0,
+   "y": 355
+  },
+  "K2Node_ExecutionSequence_0": {
+   "x": 262,
+   "y": 386
+  },
+  "K2Node_CallFunction_0": {
+   "x": 463,
+   "y": 386
+  },
+  "K2Node_CallFunction_3": {
+   "x": 463,
+   "y": 549
+  },
+  "K2Node_CallFunction_1": {
+   "x": 1042,
+   "y": 549
+  },
+  "K2Node_CallFunction_6": {
+   "x": 867,
+   "y": 613
+  },
+  "K2Node_VariableGet_1": {
+   "x": 732,
+   "y": 614
+  },
+  "K2Node_Event_4": {
+   "x": 0,
+   "y": 925
+  },
+  "K2Node_IfThenElse_0": {
+   "x": 588,
+   "y": 955
+  },
+  "K2Node_CallFunction_4": {
+   "x": 353,
+   "y": 1020
+  },
+  "K2Node_VariableGet_0": {
+   "x": 226,
+   "y": 1020
+  },
+  "K2Node_VariableSet_0": {
+   "x": 839,
+   "y": 955
+  },
+  "K2Node_CallFunction_2": {
+   "x": 839,
+   "y": 1094
+  },
+  "K2Node_Event_1": {
+   "x": 0,
+   "y": 1473
+  },
+  "K2Node_Event_2": {
+   "x": 0,
+   "y": 1858
+  },
+  "K2Node_CustomEvent_0": {
+   "x": 0,
+   "y": 2243
+  },
+  "K2Node_VariableSet_1": {
+   "x": 454,
+   "y": 2288
+  },
+  "K2Node_CallFunction_5": {
+   "x": 225,
+   "y": 2353
+  }
+ },
+ "size": {
+  "K2Node_Event_0": {
+   "w": 181,
+   "h": 95
+  },
+  "K2Node_Event_1": {
+   "w": 236,
+   "h": 125
+  },
+  "K2Node_Event_2": {
+   "w": 154,
+   "h": 125
+  },
+  "K2Node_Event_3": {
+   "w": 192,
+   "h": 95
+  },
+  "K2Node_Event_4": {
+   "w": 156,
+   "h": 95
+  },
+  "K2Node_CustomEvent_0": {
+   "w": 155,
+   "h": 109
+  },
+  "K2Node_ExecutionSequence_0": {
+   "w": 131,
+   "h": 97
+  },
+  "K2Node_CallFunction_0": {
+   "w": 208,
+   "h": 119
+  },
+  "K2Node_CallFunction_1": {
+   "w": 143,
+   "h": 116
+  },
+  "K2Node_CallFunction_2": {
+   "w": 208,
+   "h": 119
+  },
+  "K2Node_CallFunction_3": {
+   "w": 199,
+   "h": 98
+  },
+  "K2Node_IfThenElse_0": {
+   "w": 181,
+   "h": 97
+  },
+  "K2Node_VariableGet_0": {
+   "w": 87,
+   "h": 32
+  },
+  "K2Node_CallFunction_4": {
+   "w": 185,
+   "h": 57
+  },
+  "K2Node_VariableSet_0": {
+   "w": 167,
+   "h": 95
+  },
+  "K2Node_VariableGet_1": {
+   "w": 95,
+   "h": 32
+  },
+  "K2Node_CallFunction_5": {
+   "w": 179,
+   "h": 57
+  },
+  "K2Node_VariableSet_1": {
+   "w": 141,
+   "h": 95
+  },
+  "K2Node_CallFunction_6": {
+   "w": 125,
+   "h": 33
+  }
+ },
+ "rows": [
+  {
+   "root": "K2Node_Event_0",
+   "top": 0,
+   "bottom": 95,
+   "right": 181
+  },
+  {
+   "root": "K2Node_Event_3",
+   "top": 355,
+   "bottom": 665,
+   "right": 1185
+  },
+  {
+   "root": "K2Node_Event_4",
+   "top": 925,
+   "bottom": 1213,
+   "right": 1047
+  },
+  {
+   "root": "K2Node_Event_1",
+   "top": 1473,
+   "bottom": 1598,
+   "right": 236
+  },
+  {
+   "root": "K2Node_Event_2",
+   "top": 1858,
+   "bottom": 1983,
+   "right": 154
+  },
+  {
+   "root": "K2Node_CustomEvent_0",
+   "top": 2243,
+   "bottom": 2410,
+   "right": 595
+  }
+ ],
+ "warnings": [],
+ "order": [
+  "K2Node_Event_0",
+  "K2Node_Event_3",
+  "K2Node_Event_4",
+  "K2Node_Event_1",
+  "K2Node_Event_2",
+  "K2Node_CustomEvent_0"
+ ]
+}

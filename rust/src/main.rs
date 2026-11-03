@@ -4,6 +4,7 @@ mod dispatch;
 mod editor;
 mod epic;
 mod http;
+mod layout;
 mod locks;
 mod mcp;
 mod project_files;
