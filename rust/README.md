@@ -1,56 +1,13 @@
 # ue-mcp-rs: multi-agent Rust server
 
-A Rust MCP server for Unreal Engine 5, built so several AI agents can drive one editor at the same time. It talks to this repository's `UE_MCP_Bridge` editor plugin, exposes the same tool surface as the Node server (28 categories, ~2,000 actions), and replaces only the Node.js part.
+A Rust MCP server for Unreal Engine 5, built so several AI agents can drive one editor at the same time. It talks to this repository's `UE_MCP_Bridge` editor plugin and exposes the same tool surface as upstream's Node server (28 categories, ~2,000 actions).
 
-## Why the Node server struggles with many agents
+Installation, requirements and the comparison with upstream are in the [main README](../README.md). This page is the server reference: transports, multi-agent details, options, and what was ported.
 
-| Problem | Cause | What this fork does |
-|---|---|---|
-| Agents wait on each other | The Node daemon sends every agent's calls down **one** socket, and the stock plugin answers one request per socket at a time. A 5-minute landscape erosion blocks everyone. | The Rust server keeps a pool of sockets and sends each call on an idle one: 4 sockets means 4 calls in flight even with a stock plugin. This fork's plugin also runs many requests per socket. |
-| Slow even for tiny calls | Handlers run on the game thread, and an unfocused editor throttles its frame rate ("Use Less CPU when in Background"). Agents always drive an unfocused editor. | This fork's plugin turns throttling off while a client is connected. |
-| Large requests crash or stall | The plugin closes the socket on messages over 64 MiB, which kills every call in flight on it. | The server refuses oversize requests itself with a clear error, so the socket survives. Answers up to 512 MiB are accepted. |
-| Locks don't separate agents | The Node server's lock owner is per editor, so all agents count as the same owner. | Each MCP session, or each `agent` name, is its own owner. A mutation of an asset someone else locked is refused immediately. |
-| Huge tool list in every agent's context | Full descriptions are ~50k tokens. | `--compact`, `--no-epic` and `--tools` cut it to 2k–15k tokens. |
+## Transports
 
-One limit can't be removed: Unreal runs editor operations on its single game thread, so handlers still execute one after another. What changes is that no agent queues behind another agent's socket, and the editor ticks at full speed.
-
-## Setup
-
-**1. Install the editor plugin from this fork.** The plugin in [`plugin/ue_mcp_bridge`](../plugin/ue_mcp_bridge) adds concurrent requests, no background throttling, and builds on UE 5.5.4 through 5.8 (see [PLUGIN-PATCH.md](PLUGIN-PATCH.md)). Install it into a project; any plugin already there is moved to `Saved/` as a backup:
-
-```powershell
-.\rust\install-plugin.ps1 -Project C:\Path\To\MyGame\MyGame.uproject
-```
-
-Then rebuild the project's editor target; the script says how for C++ and for Blueprint-only projects. It has been compiled and live-tested on UE 5.5.4 and 5.8.2. The Rust server also works with a stock plugin, just with less concurrency.
-
-**2. Get the server.** No Rust needed: each `rust-v*` release on this fork's Releases page carries prebuilt binaries for Windows, macOS and Linux. On Windows, this downloads the newest one and registers it for your project:
-
-```powershell
-.\rust\install.ps1 -Project C:\Path\To\MyGame.uproject
-```
-
-It installs to `%LOCALAPPDATA%\ue-mcp-rs\ue-mcp-rs.exe`; run it again to update. To build from source instead: `cd rust` then `cargo build --release`, which gives `rust/target/release/ue-mcp-rs.exe`.
-
-**3. Register it with Claude Code** (`install.ps1 -Project` already did this). Remove any Node `ue-mcp` entry first so agents don't see every tool twice.
-
-Option A, stdio: one Claude Code session and its subagents.
-
-```bash
-claude mcp add ue -- "<repo>\rust\target\release\ue-mcp-rs.exe" "C:\Path\To\MyGame.uproject" --compact
-```
-
-Option B, HTTP hub: several Claude Code sessions or terminals sharing one editor. Start the hub once:
-
-```bash
-"<repo>\rust\target\release\ue-mcp-rs.exe" "C:\Path\To\MyGame.uproject" --http 127.0.0.1:7878
-```
-
-Then point each session at it, optionally scoped:
-
-```bash
-claude mcp add --transport http ue "http://127.0.0.1:7878/mcp?agent=lighting&compact=1&tools=level,material"
-```
+- **stdio** (default): one Claude Code session and all its subagents share one connection. `ue-mcp-rs.exe <Game.uproject> --compact`, or no project argument when started from the game's folder.
+- **Streamable HTTP**: several Claude Code sessions or terminals share one hub. Start it once with `ue-mcp-rs.exe <Game.uproject> --http 127.0.0.1:7878`, then add each session with `claude mcp add --transport http ue "http://127.0.0.1:7878/mcp?agent=lighting&compact=1&tools=level,material"`. See the antivirus note below.
 
 ## Running multiple agents
 

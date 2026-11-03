@@ -1,229 +1,135 @@
-# UE-MCP
+# UE-MCP, multi-agent edition
 
-> **About this fork:** it adds two things for running many AI agents against one editor:
-> - [`rust/`](rust/README.md): a Rust MCP server that pools editor sockets, keeps per-agent asset locks, and trims the tool list. Prebuilt binaries are on this fork's Releases page (`rust-v*` tags), so no Rust toolchain is needed.
-> - A [bridge plugin change](rust/PLUGIN-PATCH.md) that runs requests concurrently on each socket and stops background throttling while a client is connected.
->
-> Everything else follows upstream [db-lyon/ue-mcp](https://github.com/db-lyon/ue-mcp).
+Control the Unreal Engine editor from AI agents, **several of them at once**. A fork of [db-lyon/ue-mcp](https://github.com/db-lyon/ue-mcp) with:
 
-[![npm version](https://img.shields.io/npm/v/ue-mcp)](https://www.npmjs.com/package/ue-mcp)
-[![npm downloads](https://img.shields.io/npm/dt/ue-mcp)](https://www.npmjs.com/package/ue-mcp)
-[![CI](https://github.com/db-lyon/ue-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/db-lyon/ue-mcp/actions/workflows/ci.yml)
-[![stars](https://img.shields.io/github/stars/db-lyon/ue-mcp)](https://github.com/db-lyon/ue-mcp/stargazers)
-[![MIT](https://img.shields.io/npm/l/ue-mcp)](LICENSE)
+- **A Rust MCP server** ([`rust/`](rust/README.md)) in place of the Node one. One small `.exe` with no runtime, built so many agents can share one editor.
+- **An improved editor plugin** ([`plugin/ue_mcp_bridge`](plugin/ue_mcp_bridge), [what changed](rust/PLUGIN-PATCH.md)):
+  - it runs requests concurrently;
+  - it stops the editor throttling itself while agents drive it from the background;
+  - it builds on **UE 5.5 through 5.8**.
 
-<img width="1354" height="586" alt="{6F52BA62-D736-454E-AD30-A1C98F9EEBAA}" src="https://github.com/user-attachments/assets/9380e080-c608-4609-ba21-90e6b0a3ba7f" />
+The same ~2,000 editor actions as upstream: Blueprints, UMG, levels, materials, animation, Niagara, PCG, landscape, audio, StateTree, GAS and more.
 
+## Why this fork
 
-**Unreal Engine Model Context Protocol Server** - gives AI assistants deep read/write access to the Unreal Editor through <!-- count:tools -->30<!-- /count --> category tools covering <!-- count:actions -->2114+<!-- /count --> actions, plus a YAML flow engine for multi-step workflows and an npm plugin system for extending the surface.
+Upstream sends every agent's calls through one connection, which the plugin answers one at a time, so agents queue behind each other. This fork:
 
-That total is <!-- count:ownActions -->1284+<!-- /count --> actions of ue-mcp's own plus Epic's entire native AI Toolset Registry: on UE 5.8+ its <!-- count:nativeToolActions -->830<!-- /count --> official Unreal tools are called in-process and surfaced as `epic_*` actions in the matching category, Sequencer in `animation`, PCG in `pcg`, static meshes in `asset`.
+| | Upstream | This fork |
+|---|---|---|
+| Agents in flight | 1 (one shared socket, answered in turn) | many: a socket pool, and each socket runs requests concurrently |
+| Unfocused editor | throttles to a few FPS | full speed while a client is connected |
+| Per-agent asset locks | one owner per editor | one per agent; another agent's mutation is refused |
+| Oversized requests | close the socket and every call on it | refused with a clear error |
+| UE 5.5.4 | doesn't compile | compiles and runs (verified) |
+| Tool list in context | ~50k tokens | 2k–15k with `--compact`, `--tools`, `--no-epic` |
 
-```mermaid
-flowchart LR
-    AI[AI Assistant] -->|stdio| MCP[MCP Server<br/>TypeScript / Node.js]
-    MCP -->|WebSocket<br/>JSON-RPC| Plugin[C++ Bridge Plugin<br/>inside Unreal Editor]
-    Plugin -->|UE API| Editor[Editor Subsystems]
-    MCP -->|direct fs| FS[Config INI<br/>C++ Headers<br/>Asset Listing]
-```
+Measured with three agents building a UMG menu, an inventory component and an interactable item in one UE 5.8 editor at once: 76 calls, 0 errors, 2.2 s wall clock, p50 96 ms ([test script](rust/tools/multi_agent_smoke.py)).
 
-Blueprints, materials, levels, actors, animation, VFX, landscape, PCG, foliage, audio, UI, physics, navigation, AI, StateTree, GAS, networking, sequencer, build pipeline - all programmable through natural language.
-
-Filesystem reads (INI config, C++ headers, asset listing) work with the editor closed, so an agent can explore the project before anything is running.
-
-## Quick Start
-
-```bash
-npx ue-mcp init
-```
-
-The interactive setup will:
-
-1. Find your `.uproject` (auto-detects in current directory)
-2. Let you choose which tool categories to enable
-3. Deploy the C++ bridge plugin to your project
-4. Enable required UE plugins (Niagara, PCG, GAS, etc.)
-5. Detect and configure your MCP client (Claude Code, Claude Desktop, Cursor, Codex)
-
-Restart the editor once after setup to load the bridge plugin. To update later, run `npx ue-mcp update` from the project directory. It updates the npm package, redeploys the C++ plugin and rebuilds it.
-
-Then talk to your AI in plain English:
-
-```
-"Check the UE-MCP connection and tell me what's in the current level."
-"Place a point light 300 units above the player start, intensity 5000, warm white."
-"Create an emissive material that pulses, and apply it to every cube in the level."
-"Build the project in Development and report any compile errors."
-```
-
-### If it doesn't connect
-
-```bash
-npx ue-mcp doctor
-```
-
-Documentation lives at **https://ue-mcp.com/docs/**, one page per file in `docs/`, published automatically on release. Link there rather than to a file in this repository.
-
-Most first-run failures are one of three things: the editor hasn't been restarted since `init`, the bridge plugin failed to compile (check the editor's Output Log for `UE_MCP_Bridge`), or the editor is open on a different project than the one configured. See [Troubleshooting](https://ue-mcp.com/docs/troubleshooting/).
-
-### Manual Configuration
-
-If you prefer to configure manually, add to your MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "ue-mcp": {
-      "command": "npx",
-      "args": ["-y", "--min-release-age=0", "ue-mcp@latest", "C:/path/to/MyGame.uproject"]
-    }
-  }
-}
-```
-
-## See It Work
-
-UE-MCP ships a built-in 19-step demo that builds a complete procedural scene - landscape, PCG scatter, Niagara VFX, materials, lighting, and a playable blueprint - entirely through the bridge:
-
-```
-demo(action="step", stepIndex=1)   ... through 19
-demo(action="cleanup")             restores the level
-```
-
-Nothing is pre-authored. Every asset in the scene is created by the agent at runtime. Full walkthrough: [Neon Shrine Demo](https://ue-mcp.com/docs/neon-shrine-demo/).
-
-## What Can It Do?
-
-| Category | Examples |
-|----------|----------|
-| **Levels** | Place/move/delete actors, spawn lights and volumes, manage splines, actor bounds, water bodies |
-| **Blueprints** | Read/write graphs, add nodes, connect pins, compile, CDO and component property access |
-| **Materials** | Create materials and instances, author expression graphs, set parameters |
-| **Assets** | CRUD, import meshes/textures/animations, datatables, mesh bounds/collision/nav |
-| **Animation** | Anim blueprints, montages, retargeting, native Control Rig editing, deterministic pose analysis |
-| **VFX** | Niagara systems, emitters, modules, renderers, parameters |
-| **Landscape** | Sculpt terrain, paint weight layers, materials, splines, proxies |
-| **Foliage** | Painting, foliage types, instance queries |
-| **PCG** | Author and execute Procedural Content Generation graphs |
-| **Audio** | SoundCues, MetaSounds, attenuation, ambient audio, submixes |
-| **UI** | UMG widgets, editor utility widgets and blueprints, runtime delegate inspection |
-| **Gameplay** | Physics, collision, navigation, navmesh inspection, behavior trees, EQS, perception, input |
-| **StateTree** | States, tasks, conditions, transitions, bindings, evaluators, parameters |
-| **Chooser** | Chooser tables, columns, rows, result assets |
-| **GAS** | Gameplay Ability System - attributes, abilities, effects, cues, actor stand-up |
-| **Networking** | Replication, dormancy, relevancy, net priority |
-| **Editor** | Console, Python, PIE, viewport, sequencer, build pipeline, logs, editor lifecycle |
-| **Reflection** | Class/struct/enum introspection, gameplay tags, SaveGame inspection |
-| **Project** | Status, INI config, C++ source/header parsing, build |
-| **Fab** | Import assets from your owned Fab library |
-| **Plugins** | Install, configure, and provision UE-MCP extension plugins |
-| **Epic** | Toolset Registry discovery, direct tool calls, agent skills (UE 5.8+) |
-| **Dataflow** | Dataflow graph nodes, pins, variables, templates (UE 5.8+) |
-| **Conversation** | Dialogue graph nodes, speakers, entry points (UE 5.8+) |
-| **Demo** | Built-in 19-step Neon Shrine procedural scene |
-| **Feedback** | Submit tool-gap reports as GitHub issues |
-
-Full parameter-level reference: [Tool Reference](https://ue-mcp.com/docs/tool-reference/).
-
-## Flows
-
-Any sequence of actions can be captured as a YAML flow in `ue-mcp.yml` next to your `.uproject`, then run as one call. Config is hot-reloaded, so you edit and re-run without restarting anything.
-
-```yaml
-ue-mcp:
-  version: 1
-
-flows:
-  build_and_check:
-    description: Build the project and verify the editor is connected
-    steps:
-      1:
-        task: project.build
-        options:
-          configuration: Development
-      2:
-        task: project.get_status
-```
-
-```
-flow(action="run", flowName="build_and_check")
-```
-
-Every one of the <!-- count:actions -->2114+<!-- /count --> actions is also a flow task. Flows support step references, retries, rollback, custom tasks in your own `.js`/`.ts`, and shell steps. See [Flows](https://ue-mcp.com/docs/flows/).
-
-## Plugins
-
-UE-MCP is extensible through npm. A plugin can inject new actions into existing categories, or provision an entirely new category backed by its own C++ handlers.
-
-```bash
-npm install ue-mcp-<plugin>
-```
-
-Injected actions appear inside the `pcg`/`landscape`/etc. tools the agent is already using, so there is nothing extra for it to discover. See [Plugins](https://ue-mcp.com/docs/plugins/) for the consumer view and [Plugin Authoring](https://ue-mcp.com/docs/plugins-authoring/) for the contract.
-
-## Agent Skills
-
-The package ships skills that teach agents the non-obvious parts of driving the editor, and they load automatically in clients that support them:
-
-| Skill | Covers |
-|-------|--------|
-| `ue-mcp-workflow` | Required order of operations, editor lifecycle, project scoping |
-| [`ue-mcp-animation`](skills/ue-mcp-animation/SKILL.md) | UE 5.8 IK/retarget authoring, per-rig Control Rig solving, generic contact locks, bake and deterministic V&V |
-| `ue-mcp-blueprint` | Graph authoring, node discovery, pin wiring, compile loops |
-| `ue-mcp-niagara` | Emitter/module stack authoring and renderer setup |
-| `ue-mcp-native-cpp` | Writing and building native C++ against the bridge |
-| `ue-mcp-epic-routing` | When to route to the `epic` toolsets vs native handlers |
-
-## Safety
-
-An agent with write access to your project is a real risk, so the bridge is built with brakes:
-
-- **Write guards** - configurable rules can block or require confirmation on mutating methods before they reach the editor.
-- **Source control guard** - writes to checked-in assets can be gated on source control state instead of silently overwriting.
-- **Flow rollback** - handlers report `created`/`existed`/`updated` and flows can snapshot git state before a run, so a failed multi-step flow doesn't leave debris.
-- **Idempotency by convention** - re-running an action that already applied is a no-op rather than a duplicate.
-
-Details: [Guards](https://ue-mcp.com/docs/plugins-guards/) and [Handler Conventions](https://ue-mcp.com/docs/handler-conventions/).
+Unreal still runs editor operations on its single game thread; what's gone is agents waiting on each other's sockets.
 
 ## Requirements
 
-| | |
+- Windows 10/11; the server also builds for macOS and Linux.
+- Unreal Engine **5.5–5.8**: launcher install or source build. Verified on 5.5.4 and 5.8.2.
+- Visual Studio 2022 with the C++ game-dev workload, to compile the plugin.
+- [Claude Code](https://claude.com/claude-code), or any MCP client.
+
+## Install
+
+**1. Get this repository.** The fork's work is on the `rust-hub` branch:
+
+```bash
+git clone -b rust-hub https://github.com/ColdSiemens/ue-mcp-rust.git
+```
+
+**2. Install the plugin into your game.** Any `UE_MCP_Bridge` already there, stock or patched by hand, is moved to `Saved\` as a backup:
+
+```powershell
+.\rust\install-plugin.ps1 -Project D:\Games\MyGame\MyGame.uproject
+```
+
+Then compile it for your engine:
+- **C++ project:** build the Editor target.
+- **Blueprint-only project:** open the project and accept the rebuild prompt.
+
+**3. Get the server.**
+- **Prebuilt** (no Rust needed), once a `rust-v*` release is on the Releases page. This downloads it to `%LOCALAPPDATA%\ue-mcp-rs` and registers it with Claude Code for that project:
+  ```powershell
+  .\rust\install.ps1 -Project D:\Games\MyGame\MyGame.uproject
+  ```
+- **From source:** gives `rust\target\release\ue-mcp-rs.exe`.
+  ```bash
+  cd rust
+  cargo build --release
+  ```
+
+**4. Register it with Claude Code** (step 3's `install.ps1` already did this). Use stdio:
+
+```powershell
+claude mcp add ue -- "$env:LOCALAPPDATA\ue-mcp-rs\ue-mcp-rs.exe" "D:\Games\MyGame\MyGame.uproject" --compact
+```
+
+For a team, commit a `.mcp.json` at the game's root, so everyone who installed the server gets it with no per-machine paths. The server finds the `.uproject` in its working folder:
+
+```json
+{ "mcpServers": { "ue": { "command": "${LOCALAPPDATA}/ue-mcp-rs/ue-mcp-rs.exe", "args": ["--compact"] } } }
+```
+
+Remove any old Node `ue-mcp` entry so agents don't see every tool twice.
+
+**5. Check it.** Ask the agent to run `project(action="get_status")`. It reports the editor's engine version, `concurrentDispatch: true`, and the open connections. `editor(action="start_editor")` launches the editor if it isn't running.
+
+## Running several agents
+
+- **Subagents of one Claude Code session share one connection.** Tell each one to put `agent: "<its name>"` in the args of every call, so its locks are its own.
+- **Separate Claude Code sessions** can share one HTTP hub, `ue-mcp-rs.exe <uproject> --http 127.0.0.1:7878`, with each session using `http://127.0.0.1:7878/mcp?agent=<name>`. See the antivirus note below first.
+- **Lock before multi-step edits:** `asset(action="lock", args={assetPath})` … `asset(action="unlock")`.
+- **Give each agent its own folder or sublevel, and prefer batch actions.** The game thread does one thing at a time.
+
+Example subagent brief:
+
+> You are the UI agent. Use the `ue` tools and pass `agent:"ui"` in the args of every call. Work only under /Game/UI. Lock a widget before editing it and unlock it when you're done.
+
+All options, the per-session filters and the full list of what was ported are in [rust/README.md](rust/README.md).
+
+## Engine versions
+
+| Engine | Status |
 |---|---|
-| **Unreal Engine** | 5.4-5.8 (Windows), 5.6+ (Linux and macOS). `epic` category needs 5.8+. |
-| **Node.js** | 18 or newer |
-| **UE plugins** | `PythonScriptPlugin` (ships with the engine); `init` enables the rest for you |
-| **C++ toolchain** | Required - the bridge is a C++ plugin and compiles on first editor launch. On Windows that means Visual Studio with the C++ workload; on macOS, Xcode command line tools. |
+| 5.8 | Compiled and live-tested (5.8.2) |
+| 5.5 | Compiled and live-tested (5.5.4) |
+| 5.6, 5.7 | Expected to work, not tested here |
 
-Editor process control (`editor(start_editor)` / `stop_editor` / `restart_editor`) works on Windows, macOS and Linux. Set `UE_EDITOR_PATH` if the engine is installed somewhere non-standard.
+Below 5.8, a few actions and options return "requires UE 5.8" instead of failing; the list is in [PLUGIN-PATCH.md](rust/PLUGIN-PATCH.md). The server reads the editor's engine version and hides what that editor can't run, including the `epic_*` toolset actions, which need 5.8. After merging upstream changes, `rust\tools\check-engine-compat.ps1` recompiles the plugin against every installed engine.
 
-## Documentation
+## Troubleshooting
 
-**[https://ue-mcp.com/docs](https://ue-mcp.com/docs)**
+- **The editor isn't found or connected.** `project(action="get_status")` lists the ports tried. The editor publishes its port in `<Project>/Saved/UE_MCP_Bridge/port.json`; `--bridge-port` overrides it.
+- **Antivirus and HTTP mode.** Some antivirus web shields, Avast among them, proxy localhost HTTP and corrupt responses, even with the project folder excluded. Use stdio, or exclude `127.0.0.1` in the web shield.
+- **Plugin build errors after updating.** Run `rust\tools\check-engine-compat.ps1` and see [PLUGIN-PATCH.md](rust/PLUGIN-PATCH.md).
+- **`stop_editor` seems slow.** The editor is showing its own "Save Content" prompt. It never discards work; answer the prompt or save first.
 
-- [Getting Started](https://ue-mcp.com/docs/getting-started/) - Zero-knowledge walkthrough, install to first actor placed
-- [Tool Reference](https://ue-mcp.com/docs/tool-reference/) - Every tool, action, and parameter
-- [Architecture](https://ue-mcp.com/docs/architecture/) - How the server, bridge, and editor fit together
-- [Flows](https://ue-mcp.com/docs/flows/) - Multi-step YAML workflows, custom tasks, rollback
-- [Plugins](https://ue-mcp.com/docs/plugins/) - Extending the surface through npm
-- [Configuration](https://ue-mcp.com/docs/configuration/) - `ue-mcp.yml` and MCP client config
-- [Troubleshooting](https://ue-mcp.com/docs/troubleshooting/) - Connection, build, and asset path issues
-- [Development](https://ue-mcp.com/docs/development/) - Building from source, testing, contributing
+## Repository layout
 
-## Sponsor
+| Path | What |
+|---|---|
+| `rust/` | The Rust MCP server, its tests, install scripts and tools |
+| `plugin/ue_mcp_bridge/` | The editor plugin (upstream plus this fork's changes) |
+| `src/`, `docs/`, `skills/` | Upstream's Node server and docs, unchanged; [upstream README](docs/upstream-README.md) |
+| `tests/ue_mcp/` | Upstream's UE 5.8 test project |
 
-Thanks for using UE-MCP. It's free and MIT licensed. If it helps your work,
-[sponsorship](https://github.com/sponsors/db-lyon) is appreciated.
+## Development
 
-## Contributing
+```bash
+cd rust
+cargo test
+```
 
-Issues and pull requests welcome. Start with [Development](https://ue-mcp.com/docs/development/).
-
-Install [git-lfs](https://git-lfs.com) before cloning - the bundled test project stores `.uasset` / `.umap` via LFS, and a plain `git clone` leaves them as pointer files.
-
-If an AI agent had to fall back to `execute_python` during your session, it will offer to submit structured feedback automatically. That is how we prioritize which native handlers to add next.
+- `cargo test` runs unit and end-to-end tests against a simulated editor.
+- `python rust/tools/multi_agent_smoke.py --exe ... --project ... --start-editor` runs three agents against a real editor.
+- `rust\tools\check-engine-compat.ps1` compiles the plugin on every installed UE 5.5+.
+- CI builds and tests Windows and Linux on every push. A `rust-v*` tag publishes a release.
 
 ## License
 
-UE-MCP is licensed under the **MIT License**. Use it freely in personal, educational, and commercial projects. See [LICENSE](LICENSE).
-
-Contributions are accepted under the same MIT License (inbound contributions are licensed under the project's outbound license).
+MIT, as upstream ([LICENSE](LICENSE)). Original work © David Bingham, [db-lyon/ue-mcp](https://github.com/db-lyon/ue-mcp).
