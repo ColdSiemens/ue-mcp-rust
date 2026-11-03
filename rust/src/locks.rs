@@ -63,6 +63,40 @@ pub fn asset_paths(obj: &Map<String, Value>) -> Vec<String> {
     out
 }
 
+/// Path parameters that name a folder, a file on disk, an actor, or an asset
+/// the write only reads from, never the asset it edits.
+const NOT_TARGET_KEYS: &[&str] = &[
+    "packagePath", "package_path", "folderPath", "folder_path", "filePath", "fbx_file_path", "actorPath",
+    "skeletonPath", "skeletalMeshPath", "meshPath", "animSequencePath", "anim_sequence_path",
+];
+
+/// The asset a write edits, by the convention its signature follows: the
+/// first path parameter, e.g. `systemPath` in `set_module_input(systemPath, ...)`.
+/// None when that first one is a folder, file, actor or read-only input.
+pub fn primary_target_key(signature: &str) -> Option<&str> {
+    let args = signature.split_once('(')?.1;
+    let is_path = |w: &&str| ["Path", "_path", "Paths", "_paths"].iter().any(|s| w.ends_with(s));
+    let first = args.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).find(is_path)?;
+    (!NOT_TARGET_KEYS.contains(&first)).then_some(first)
+}
+
+/// Every asset a write's lock check covers: the well-known path keys plus the
+/// action's own primary target.
+pub fn write_targets(obj: &Map<String, Value>, signature: Option<&str>) -> Vec<String> {
+    let mut out = asset_paths(obj);
+    if let Some(key) = signature.and_then(primary_target_key).filter(|k| !PATH_KEYS.contains(k) && !PATH_LIST_KEYS.contains(k)) {
+        let mut extra = Map::new();
+        if let Some(v) = obj.get(key) {
+            // Reuse the path checks by presenting the value under a known key.
+            extra.insert(if v.is_array() { "paths" } else { "path" }.into(), v.clone());
+        }
+        out.extend(asset_paths(&extra));
+        out.sort();
+        out.dedup();
+    }
+    out
+}
+
 impl LockTable {
     pub fn record(&self, path: &str, owner: &str, ttl: Duration) {
         self.held.lock().unwrap().insert(normalize(path), Held { owner: owner.to_string(), expires: Instant::now() + ttl });
@@ -128,5 +162,26 @@ mod tests {
     #[test]
     fn filesystem_paths_are_not_assets() {
         assert!(asset_paths(json!({ "path": "C:/Temp/x.fbx" }).as_object().unwrap()).is_empty());
+    }
+
+    #[test]
+    fn a_writes_first_path_parameter_is_its_target() {
+        assert_eq!(primary_target_key("set_module_input(systemPath, moduleName, inputName, value, emitterName?)"), Some("systemPath"));
+        assert_eq!(primary_target_key("add_blend_sample(assetPath|path, animation, position?:o)"), Some("assetPath"));
+        assert_eq!(primary_target_key("set_blend_sample(assetPath|path, any(position:o; x:n))"), Some("assetPath"));
+        // Inputs, folders and actors are not what the write edits.
+        assert_eq!(primary_target_key("create_anim_blueprint(name, skeletonPath, packagePath?)"), None);
+        assert_eq!(primary_target_key("set_actor_material(actorPath, materialPath)"), None);
+        assert_eq!(primary_target_key("create_montage(name, animSequencePath, packagePath?)"), None);
+    }
+
+    #[test]
+    fn write_targets_add_the_primary_target() {
+        let p = json!({ "systemPath": "/Game/FX/NS_Fire.NS_Fire", "moduleName": "Spawn" });
+        assert_eq!(write_targets(p.as_object().unwrap(), Some("set_module_input(systemPath, moduleName)")), vec!["/game/fx/ns_fire"]);
+        let p = json!({ "control_rig_asset_path": ["/Game/Rig/CR_A", "C:/x"] });
+        assert_eq!(write_targets(p.as_object().unwrap(), Some("x(control_rig_asset_path)")), vec!["/game/rig/cr_a"]);
+        let p = json!({ "skeletonPath": "/Game/Char/SK" });
+        assert!(write_targets(p.as_object().unwrap(), Some("create_blendspace(name, skeletonPath)")).is_empty());
     }
 }

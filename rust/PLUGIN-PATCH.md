@@ -1,10 +1,11 @@
 # UE_MCP_Bridge changes in this fork
 
-This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1) plus four changes:
+This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1) plus five changes:
 1. Concurrent requests per socket.
 2. No background throttling while a client is connected.
 3. Builds on UE 5.5.4.
 4. A batch node-move handler for Blueprint layout.
+5. Writes are checked against the editor's lock registry.
 
 Status:
 - Compiled on UE 5.8.2 and UE 5.5.4. `rust/tools/check-engine-compat.ps1` repeats the check.
@@ -60,6 +61,13 @@ This moves many nodes of one graph in a single game-thread call: `{assetPath, gr
 - **Refresh:** the graph is notified once.
 - **Result:** it reports `moved`, `unchanged`, and the node IDs it couldn't find.
 - **Who uses it:** the Rust server's `blueprint(auto_layout)` calls it when the plugin registers it.
+
+**5. Lock check on writes** (`BridgeServer.cpp`, `LockRegistry.cpp`)
+
+A request frame may carry `lockCheck: {sessionId, paths}` beside `method` and `params`. Before the handler runs, on the game thread, the plugin refuses the call if another session holds a lock on any of `paths`. The refusal has the same shape as the server's own: `{success: false, error, lock: {assetPath, holder}}`.
+- **Before:** the lock registry only answered `acquire_lock`. Writes were checked by the server process that sent them, which only knows the locks it granted. Each Claude Code session runs its own server process over stdio, so a lock taken in one session didn't stop a write from another.
+- **Race-free:** `acquire_lock` also runs on the game thread, so no lock can be taken between the check and the write.
+- **Who decides what is a write:** the client. The Rust server sends `lockCheck` for every non-read action, with the asset paths it found in the parameters. The plugin advertises the `lock-check` feature. The server sends `lockCheck` without waiting for that, because a new session's first write can arrive before its handshake; a plugin without the check ignores the field.
 
 ## Opt-outs
 

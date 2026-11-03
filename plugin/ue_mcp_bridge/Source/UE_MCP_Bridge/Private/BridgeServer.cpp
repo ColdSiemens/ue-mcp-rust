@@ -25,6 +25,7 @@
 #include "Misc/Char.h"
 #include "Async/Async.h"
 #include "HandlerCatalog.h"
+#include "LockRegistry.h"
 
 #include "MCPSocketPlatform.h"
 
@@ -638,6 +639,8 @@ TSharedPtr<FJsonObject> FMCPBridgeServer::BuildCapabilitiesPayload()
 		TEXT("handler-specs"),
 		// #1339: a frame-level timeoutMs raises the game-thread wait.
 		TEXT("call-timeout"),
+		// A frame-level lockCheck refuses a write to an asset another session locked.
+		TEXT("lock-check"),
 	};
 	TArray<TSharedPtr<FJsonValue>> FeatureValues;
 	for (const TCHAR* Feature : Features)
@@ -777,9 +780,40 @@ FString FMCPBridgeServer::ProcessMessage(const FString& Message)
 		return CreateJsonRpcError(Request, -32601, DescribeUnknownMethod(Method));
 	}
 
-	// Execute handler on game thread
-	FMCPHandlerRegistry::FHandlerFunction Handler = [this, Method](const TSharedPtr<FJsonObject>& HandlerParams) -> TSharedPtr<FJsonValue>
+	// A frame-level lockCheck {sessionId, paths} names the assets a write will
+	// touch and who is writing. The client decides which calls are writes; the
+	// check itself runs here against the one registry every client shares, so
+	// a lock taken through one MCP server process also stops writes sent
+	// through another.
+	FString LockSessionId;
+	TArray<FString> LockPaths;
+	const TSharedPtr<FJsonObject>* LockCheck = nullptr;
+	if (Request->TryGetObjectField(TEXT("lockCheck"), LockCheck) && LockCheck && (*LockCheck).IsValid())
 	{
+		(*LockCheck)->TryGetStringField(TEXT("sessionId"), LockSessionId);
+		(*LockCheck)->TryGetStringArrayField(TEXT("paths"), LockPaths);
+	}
+
+	// Execute handler on game thread
+	FMCPHandlerRegistry::FHandlerFunction Handler = [this, Method, LockSessionId, LockPaths](const TSharedPtr<FJsonObject>& HandlerParams) -> TSharedPtr<FJsonValue>
+	{
+		// Checked on the game thread, where acquire_lock also runs, so a lock
+		// can't be taken between this check and the write.
+		FMCPAssetLock Holder;
+		if (LockPaths.Num() > 0 && FMCPLockRegistry::Get().FindConflict(LockPaths, LockSessionId, Holder))
+		{
+			TSharedPtr<FJsonObject> HolderJson = MakeShared<FJsonObject>();
+			HolderJson->SetStringField(TEXT("sessionId"), Holder.SessionId);
+			HolderJson->SetNumberField(TEXT("ttlSecondsRemaining"), FMath::Max(0.0, Holder.ExpiresMono - FPlatformTime::Seconds()));
+			TSharedPtr<FJsonObject> Lock = MakeShared<FJsonObject>();
+			Lock->SetStringField(TEXT("assetPath"), Holder.AssetPath);
+			Lock->SetObjectField(TEXT("holder"), HolderJson);
+			TSharedPtr<FJsonObject> Refusal = MakeShared<FJsonObject>();
+			Refusal->SetBoolField(TEXT("success"), false);
+			Refusal->SetStringField(TEXT("error"), TEXT("Another agent holds a lock on this asset. Work on something else, or wait and retry."));
+			Refusal->SetObjectField(TEXT("lock"), Lock);
+			return MakeShared<FJsonValueObject>(Refusal);
+		}
 		return HandlerRegistry.ExecuteHandler(Method, HandlerParams);
 	};
 

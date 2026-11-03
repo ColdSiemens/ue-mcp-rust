@@ -12,7 +12,7 @@ Installation, requirements and the comparison with upstream are in the [main REA
 ## Running multiple agents
 
 - **Name each agent.** Over HTTP, use `?agent=<name>` in the URL. Subagents of one Claude Code session share a single connection, so tell each one to pass `agent:"<name>"` inside `args` on every call. The server instructions already tell models to do this.
-- **Lock before multi-step edits.** Call `asset(action="lock", args={assetPath, agent})`, do the work, then `asset(action="unlock")`. Another agent's mutation of that asset is refused with the holder's name. Locks expire after `ttlSeconds` (default 300), and an HTTP session's locks are released when it closes.
+- **Lock before multi-step edits.** Call `asset(action="lock", args={assetPath, agent})`, do the work, then `asset(action="unlock")`. Another agent's mutation of that asset is refused with the holder's name, whichever Claude Code session that agent is in: the editor plugin keeps the locks and checks every write against them. Locks expire after `ttlSeconds` (default 300), and an HTTP session's locks are released when it closes.
 - **Give agents disjoint areas** (their own folders, levels or sublevels). The game thread serializes their work, but the work doesn't collide.
 - **Prefer batch actions** (`batch_set_properties`, `spawn_actors_batch`, `niagara(batch)`, `blueprint(author)`). One game-thread trip beats twenty.
 - A timed-out mutation may still have landed, so read the state before retrying. Pass `timeoutMs` for long operations.

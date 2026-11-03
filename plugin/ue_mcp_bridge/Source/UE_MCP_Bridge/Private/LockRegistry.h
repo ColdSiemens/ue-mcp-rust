@@ -59,6 +59,12 @@ public:
 	/** Snapshot of all currently-held (non-expired) locks. */
 	TArray<FMCPAssetLock> List();
 
+	/** Whether any of AssetPaths is held by a live session other than SessionId.
+	 *  On true OutHolder describes the first such lock. A write checks this on
+	 *  the game thread right before it runs, where Acquire also runs, so no
+	 *  lock can be taken between the check and the write. */
+	bool FindConflict(const TArray<FString>& AssetPaths, const FString& SessionId, FMCPAssetLock& OutHolder);
+
 private:
 	void PurgeExpired(double Now);
 

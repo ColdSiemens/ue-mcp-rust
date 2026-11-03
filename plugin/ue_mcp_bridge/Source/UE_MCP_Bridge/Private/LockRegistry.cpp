@@ -107,6 +107,22 @@ int32 FMCPLockRegistry::ReleaseSession(const FString& SessionId)
 	return Count;
 }
 
+bool FMCPLockRegistry::FindConflict(const TArray<FString>& AssetPaths, const FString& SessionId, FMCPAssetLock& OutHolder)
+{
+	FScopeLock ScopeLock(&Mutex);
+	PurgeExpired(FPlatformTime::Seconds());
+	for (const FString& Path : AssetPaths)
+	{
+		const FMCPAssetLock* Existing = Locks.Find(NormalizeKey(Path));
+		if (Existing && Existing->SessionId != SessionId)
+		{
+			OutHolder = *Existing;
+			return true;
+		}
+	}
+	return false;
+}
+
 TArray<FMCPAssetLock> FMCPLockRegistry::List()
 {
 	FScopeLock ScopeLock(&Mutex);

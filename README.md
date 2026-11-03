@@ -18,7 +18,7 @@ Upstream sends every agent's calls through one connection, which the plugin answ
 |---|---|---|
 | Agents in flight | 1 (one shared socket, answered in turn) | many: a socket pool, and each socket runs requests concurrently |
 | Unfocused editor | throttles to a few FPS | full speed while a client is connected |
-| Per-agent asset locks | one owner per editor | one per agent; another agent's mutation is refused |
+| Per-agent asset locks | one owner per editor | one per agent, shared by every session; another agent's mutation is refused |
 | Oversized requests | close the socket and every call on it | refused with a clear error |
 | UE 5.5.4 | doesn't compile | compiles and runs (verified) |
 | Tool list in context | ~50k tokens | 2k–15k with `--compact`, `--tools`, `--no-epic` |
@@ -84,6 +84,7 @@ Remove any old Node `ue-mcp` entry so agents don't see every tool twice.
 
 ## Running several agents
 
+- **Each Claude Code session starts its own `ue-mcp-rs.exe`** (that's how stdio MCP servers work); its subagents share it. All of them talk to the same editor, and the editor plugin holds the locks, so a lock taken in one session stops writes from every other.
 - **Subagents of one Claude Code session share one connection.** Tell each one to put `agent: "<its name>"` in the args of every call, so its locks are its own.
 - **Separate Claude Code sessions** can share one HTTP hub, `ue-mcp-rs.exe <uproject> --http 127.0.0.1:7878`, with each session using `http://127.0.0.1:7878/mcp?agent=<name>`. See the antivirus note below first.
 - **Lock before multi-step edits:** `asset(action="lock", args={assetPath})` … `asset(action="unlock")`.

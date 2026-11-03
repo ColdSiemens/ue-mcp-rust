@@ -3,6 +3,7 @@
 //! The fake behaves like a stock UE_MCP_Bridge plugin where it matters here:
 //! one thread per socket, requests on a socket answered strictly in order,
 //! the capabilities handshake, the lock registry, and the 64 MiB inbound cap.
+//! Like this fork's plugin, it also honours a frame-level lockCheck.
 
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -91,8 +92,16 @@ async fn serve_socket(stream: TcpStream, st: Arc<FakeState>, methods: Arc<Vec<St
         let Message::Text(text) = msg else { continue };
         let req: Value = serde_json::from_str(&text).unwrap();
         let params = req["params"].clone();
-        let result = match req["method"].as_str().unwrap() {
-            "get_bridge_capabilities" => json!({ "protocolVersion": 3, "engineVersion": "5.5.4-40574608+++UE5+Release-5.5", "features": [], "actionCount": methods.len(), "actions": *methods }),
+        // The patched plugin's lockCheck: refuse a write to an asset another session holds.
+        let refusal = req["lockCheck"]["paths"].as_array().and_then(|paths| {
+            let who = req["lockCheck"]["sessionId"].as_str().unwrap_or_default();
+            let locks = st.locks.lock().unwrap();
+            paths.iter().filter_map(Value::as_str).find_map(|p| {
+                locks.get(p).filter(|h| *h != who).map(|h| json!({ "success": false, "error": "Another agent holds a lock on this asset.", "lock": { "assetPath": p, "holder": { "sessionId": h } } }))
+            })
+        });
+        let result = if let Some(refusal) = refusal { refusal } else { match req["method"].as_str().unwrap() {
+            "get_bridge_capabilities" => json!({ "protocolVersion": 3, "engineVersion": "5.5.4-40574608+++UE5+Release-5.5", "features": ["lock-check"], "actionCount": methods.len(), "actions": *methods }),
             "read_blueprint" => panic!("the hub sent a method the plugin does not register"),
             "get_engine_state" => json!({ "success": true, "gameThread": "idle", "servedWithoutGameThread": true }),
             "acquire_lock" => {
@@ -130,7 +139,7 @@ async fn serve_socket(stream: TcpStream, st: Arc<FakeState>, methods: Arc<Vec<St
                 let size = params.to_string().len();
                 json!({ "success": true, "method": method, "paramBytes": size, "echo": if size < 4096 { params } else { Value::Null } })
             }
-        };
+        } };
         let reply = json!({ "jsonrpc": "2.0", "id": req["id"], "result": result }).to_string();
         if sink.send(Message::Text(reply)).await.is_err() {
             return;
@@ -469,6 +478,34 @@ async fn subagents_sharing_one_stdio_session_keep_separate_locks() {
     let (err, text) = hub.call("level", "place_actor", json!({ "assetPath": level, "actorClass": "A", "agent": "lighting" })).await;
     assert!(!err, "{text}");
     assert!(!text.contains("\"agent\""), "routing arg must not reach the editor: {text}");
+    fake.stop();
+}
+
+// Each Claude Code session runs its own server process; only the editor sees
+// every lock, so the refusal has to come from there.
+#[tokio::test(flavor = "multi_thread")]
+async fn separate_server_processes_share_the_editors_locks() {
+    let fake = FakeBridge::start(0).await;
+    let mut session_a = StdioHub::start(fake.port).await;
+    let mut session_b = StdioHub::start(fake.port).await;
+    let fire = "/Game/FX/NS_Fire";
+    let write = |agent: &str| json!({ "systemPath": format!("{fire}.NS_Fire"), "moduleName": "Spawn", "inputName": "Rate", "value": 5, "agent": agent });
+
+    let (err, text) = session_a.call("asset", "lock", json!({ "assetPath": fire, "agent": "fx" })).await;
+    assert!(!err && text.contains("\"acquired\":true"), "{text}");
+
+    let (err, text) = session_b.call("niagara", "set_module_input", write("level")).await;
+    assert!(err && text.contains("fx"), "the other process must be refused: {text}");
+    let (err, text) = session_b.call("asset", "lock", json!({ "assetPath": fire, "agent": "level" })).await;
+    assert!(!err && text.contains("\"acquired\":false"), "{text}");
+
+    let (err, text) = session_a.call("niagara", "set_module_input", write("fx")).await;
+    assert!(!err, "the holder is not blocked by its own lock: {text}");
+
+    let (err, _) = session_a.call("asset", "unlock", json!({ "assetPath": fire, "agent": "fx" })).await;
+    assert!(!err);
+    let (err, text) = session_b.call("niagara", "set_module_input", write("level")).await;
+    assert!(!err, "{text}");
     fake.stop();
 }
 

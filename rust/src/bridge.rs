@@ -197,10 +197,19 @@ impl Bridge {
     /// Send one request and wait up to `wait` for its answer, counted from the
     /// moment it was written. Time spent waiting for a free socket is extra.
     pub async fn call(&self, method: &str, params: Value, frame_timeout_ms: Option<u64>, wait: Duration) -> Result<Value, BridgeError> {
+        self.call_checked(method, params, frame_timeout_ms, wait, None).await
+    }
+
+    /// `call`, plus a frame-level `lockCheck` the plugin tests against its
+    /// shared lock registry right before it runs the handler.
+    pub async fn call_checked(&self, method: &str, params: Value, frame_timeout_ms: Option<u64>, wait: Duration, lock_check: Option<Value>) -> Result<Value, BridgeError> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let mut frame = json!({ "id": id.to_string(), "method": method, "params": params });
         if let Some(ms) = frame_timeout_ms {
             frame["timeoutMs"] = json!(ms);
+        }
+        if let Some(check) = lock_check {
+            frame["lockCheck"] = check;
         }
         let text = serde_json::to_string(&frame).expect("a Value always serializes");
         drop(frame);

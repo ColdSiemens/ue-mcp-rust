@@ -216,8 +216,12 @@ impl Hub {
         let owner = routing.agent.clone().unwrap_or_else(|| session.owner.clone());
         self.coerce_json_strings(action, &mut params);
 
+        // Writes are checked twice: here against the locks this process
+        // granted, and by the plugin against every lock in the editor, which
+        // covers the ones other server processes (other sessions) took.
+        let mut lock_check = None;
         if self.opts.enforce_locks && action.effect != Effect::Read && !matches!(action.dispatch, Dispatch::Local) {
-            let paths = locks::asset_paths(&params);
+            let paths = locks::write_targets(&params, action.signature.as_deref());
             if let Some(conflict) = self.locks.conflict(&paths, &owner) {
                 let body = json!({
                     "success": false,
@@ -225,6 +229,12 @@ impl Hub {
                     "lock": conflict,
                 });
                 return ToolResult { text: body.to_string(), is_error: true };
+            }
+            // Sent without waiting for the handshake to say the plugin checks
+            // it: a new session's first write can beat the handshake, and a
+            // plugin without the check ignores the field.
+            if !paths.is_empty() {
+                lock_check = Some(json!({ "sessionId": owner, "paths": paths }));
             }
         }
 
@@ -240,9 +250,9 @@ impl Hub {
             .flatten();
 
         let outcome = match &action.dispatch {
-            Dispatch::Bridge { method } => self.bridge_call(method, Value::Object(params), routing.timeout_ms.or(action.timeout_ms)).await,
+            Dispatch::Bridge { method } => self.bridge_call_checked(method, Value::Object(params), routing.timeout_ms.or(action.timeout_ms), lock_check).await,
             Dispatch::Epic { toolset, tool: epic_tool, schema } => match epic::build_call(toolset, epic_tool, schema, &params) {
-                Ok(envelope) => self.bridge_call("epic_call_tool", envelope, routing.timeout_ms.or(action.timeout_ms)).await,
+                Ok(envelope) => self.bridge_call_checked("epic_call_tool", envelope, routing.timeout_ms.or(action.timeout_ms), lock_check).await,
                 Err(msg) => Err(msg),
             },
             Dispatch::Local => self.local(session, tool, action, params, &routing).await,
@@ -307,11 +317,15 @@ impl Hub {
     }
 
     pub async fn bridge_call(&self, method: &str, params: Value, frame_timeout_ms: Option<u64>) -> CallResult {
+        self.bridge_call_checked(method, params, frame_timeout_ms, None).await
+    }
+
+    async fn bridge_call_checked(&self, method: &str, params: Value, frame_timeout_ms: Option<u64>, lock_check: Option<Value>) -> CallResult {
         let frame_timeout_ms = frame_timeout_ms.map(|t| t.min(MAX_TIMEOUT_MS));
         let registered = self.surface.handler_timeout_secs(method).map(|s| s * 1000).unwrap_or(DEFAULT_HANDLER_TIMEOUT_MS);
         let wait = registered.max(frame_timeout_ms.unwrap_or(0)).min(MAX_TIMEOUT_MS) + SERVER_TIMEOUT_MARGIN_MS;
         self.bridge
-            .call(method, strip_nulls(params), frame_timeout_ms, Duration::from_millis(wait))
+            .call_checked(method, strip_nulls(params), frame_timeout_ms, Duration::from_millis(wait), lock_check)
             .await
             .map_err(|e| describe(method, e))
     }
