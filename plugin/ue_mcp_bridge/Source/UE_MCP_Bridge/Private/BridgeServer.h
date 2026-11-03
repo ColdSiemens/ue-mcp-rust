@@ -49,6 +49,9 @@ private:
 
 class FMCPBridgeServer;
 
+/** What one connection's reader and its request workers share. Defined in BridgeServer.cpp. */
+struct FMCPConnectionChannel;
+
 /**
  * Takes the handle out of the live connection set.
  *
@@ -280,6 +283,36 @@ private:
 
 	/** Write every byte or report failure. Partial sends are not success. */
 	static bool SendAll(FMCPSocketHandle SocketFD, const uint8* Data, int32 NumBytes);
+
+	// ── Concurrent dispatch ──────────────────────────────────────────────────
+	//
+	// A connection used to answer its requests strictly one after another: the
+	// reader called ProcessMessage inline and read nothing more until the game
+	// thread had answered. A client that multiplexes callers over one socket
+	// (several agents behind one server) therefore queued every caller behind
+	// the slowest call. Each request now runs on its own worker thread, which
+	// waits for the game thread and writes its own answer. The game thread
+	// still runs handlers one at a time; what changes is that requests waiting
+	// for it no longer wait for each other first.
+
+	/** Write one whole frame under the connection's send lock, so frames from
+	 *  different workers never interleave. Sends nothing once a close frame has
+	 *  gone out, and marks the channel broken when the socket fails. */
+	static bool SendOnChannel(FMCPConnectionChannel& Channel, const TArray<uint8>& Frame);
+
+	/** SendCloseFrame under the same lock. Nothing is sent on the channel after it. */
+	static void SendCloseOnChannel(FMCPConnectionChannel& Channel, uint16 StatusCode, const FString& Reason);
+
+	/** Run one request and send its answer: on a worker thread, or inline in
+	 *  serial mode. False only when an inline answer could not be sent. */
+	bool DispatchRequest(const TSharedRef<FMCPConnectionChannel, ESPMode::ThreadSafe>& Channel, FString&& Message);
+
+	/** Block until no worker of this connection is running. */
+	static void WaitForChannelWorkers(const FMCPConnectionChannel& Channel);
+
+	/** False under UE_MCP_SERIAL_DISPATCH=1 or -MCPSerialDispatch: one request
+	 *  at a time per connection, as before. Fixed at construction. */
+	const bool bConcurrentDispatch;
 
 	// #821: connection threads capture `this` and outlive the accept loop, so
 	// shutdown has to be able to find them, wake them, and wait for them. The

@@ -1,6 +1,7 @@
 #include "BridgeServer.h"
 #include "BridgeParamEcho.h"
 #include "BridgeStateFiles.h"
+#include "BridgeThrottle.h"
 #include "UE_MCP_BridgeModule.h"
 #include "MCPEngineStatus.h"
 #include "MCPHandlerRegistration.h"
@@ -34,7 +35,62 @@ namespace
 	// half-closing their sockets before giving up and saying so.
 	constexpr double kConnectionCloseGraceSeconds = 2.0;
 	constexpr double kConnectionDrainTimeoutSeconds = 10.0;
+
+	// Requests one connection may have running at once. Each holds a thread
+	// that is mostly asleep waiting for the game thread, so the bound is about
+	// a runaway client creating threads, not about load. At the bound the
+	// reader stops taking frames until a worker finishes, and TCP pushes back
+	// on the client.
+	constexpr int32 kMaxInFlightPerConnection = 32;
+
+	bool ResolveConcurrentDispatch()
+	{
+		if (FParse::Param(FCommandLine::Get(), TEXT("MCPSerialDispatch")))
+		{
+			return false;
+		}
+		const FString EnvValue = FPlatformMisc::GetEnvironmentVariable(TEXT("UE_MCP_SERIAL_DISPATCH"));
+		const bool bSerial = EnvValue == TEXT("1") || EnvValue.Equals(TEXT("true"), ESearchCase::IgnoreCase)
+			|| EnvValue.Equals(TEXT("yes"), ESearchCase::IgnoreCase);
+		return !bSerial;
+	}
 }
+
+/**
+ * What one connection's reader and its request workers share.
+ *
+ * A worker outlives the pass of the read loop that started it, so what it
+ * touches lives here behind a thread-safe shared reference rather than on the
+ * reader's stack. The reader still owns the socket and closes it: it waits
+ * for every worker before it returns, so no worker ever writes to a handle
+ * that has been closed, or closed and handed to someone else.
+ */
+struct FMCPConnectionChannel
+{
+	explicit FMCPConnectionChannel(FMCPSocketHandle InSocket)
+		: Socket(InSocket)
+	{
+	}
+
+	FMCPConnectionChannel(const FMCPConnectionChannel&) = delete;
+	FMCPConnectionChannel& operator=(const FMCPConnectionChannel&) = delete;
+
+	const FMCPSocketHandle Socket;
+
+	/** Held for the whole of one frame's write. Two workers answering at once
+	 *  would otherwise interleave their bytes into a stream nobody can parse. */
+	FCriticalSection SendMutex;
+
+	/** Workers started and not yet finished. */
+	FThreadSafeCounter InFlight;
+
+	/** A send failed. The reader treats this as the connection ending. */
+	FThreadSafeBool bBroken;
+
+	/** A close frame went out. RFC 6455 allows no data frame after it, so a
+	 *  worker finishing late drops its answer. Under SendMutex. */
+	bool bCloseSent = false;
+};
 
 FMCPConnectionUnlist::FMCPConnectionUnlist(FMCPBridgeServer& InServer, FMCPSocketHandle InHandle)
 	: Server(InServer)
@@ -64,6 +120,7 @@ FMCPBridgeServer::FMCPBridgeServer(int32 Port, const FString& InPortSource, bool
 	, ServerThread(nullptr)
 	, bShouldStop(false)
 	, bIsRunning(false)
+	, bConcurrentDispatch(ResolveConcurrentDispatch())
 	, InstanceId(FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens))
 	, StartedAtUtc(FDateTime::UtcNow())
 {
@@ -72,6 +129,11 @@ FMCPBridgeServer::FMCPBridgeServer(int32 Port, const FString& InPortSource, bool
 	// test facility, and a facility a caller can enable remotely is a facility
 	// an attacker can enable remotely.
 	FMCPParamEcho::Get().SetEnabled(FMCPParamEcho::ResolveEnabledFromEnvironment());
+
+	if (!bConcurrentDispatch)
+	{
+		UE_LOG(LogMCPBridge, Log, TEXT("[UE-MCP] Serial dispatch: each connection runs one request at a time (UE_MCP_SERIAL_DISPATCH / -MCPSerialDispatch)."));
+	}
 
 	MCPHandlerCatalog::RegisterAllHandlers(HandlerRegistry);
 }
@@ -106,6 +168,12 @@ void FMCPBridgeServer::Shutdown()
 	// its caller would otherwise sit here for the full handler timeout.
 	GameThreadExecutor.BeginShutdown();
 
+	// Only a server that ran had clients, and the throttle state is process-wide:
+	// the automation spec builds and destroys a server it never starts, inside a
+	// live editor whose real bridge must keep its clients' throttle suspended.
+	// The destructor's second Shutdown sees no thread and skips it too.
+	const bool bWasStarted = ServerThread != nullptr;
+
 	if (ServerThread)
 	{
 		ServerThread->WaitForCompletion();
@@ -129,6 +197,14 @@ void FMCPBridgeServer::Shutdown()
 				TEXT("[UE-MCP] %d bridge connection(s) still running after %.0fs. Continuing shutdown; a handler is not returning."),
 				ActiveConnectionCount.GetValue(), kConnectionCloseGraceSeconds + kConnectionDrainTimeoutSeconds);
 		}
+	}
+
+	// Every connection has ended, so every client has left: drop the queued
+	// throttle update (its callback lives in this module) and give the user
+	// their setting back now, on the game thread, while it can still run.
+	if (bWasStarted)
+	{
+		MCPBridgeThrottle::Shutdown();
 	}
 
 	bIsRunning = false;
@@ -568,6 +644,13 @@ TSharedPtr<FJsonObject> FMCPBridgeServer::BuildCapabilitiesPayload()
 	{
 		FeatureValues.Add(MakeShared<FJsonValueString>(Feature));
 	}
+	// Advertised only while it is on, unlike the always-compiled features above:
+	// a client reads it to decide whether one socket may carry many requests at
+	// once, and in serial mode the honest answer is that it may not.
+	if (bConcurrentDispatch)
+	{
+		FeatureValues.Add(MakeShared<FJsonValueString>(TEXT("concurrent-dispatch")));
+	}
 	Payload->SetArrayField(TEXT("features"), FeatureValues);
 
 	// Whether the echo is currently recording, which is a runtime fact and not
@@ -896,6 +979,12 @@ void FMCPBridgeServer::HandleWebSocketConnection(FMCPSocketHandle ClientSocketFD
 
 	UE_LOG(LogMCPBridge, Log, TEXT("[UE-MCP] Sent WebSocket handshake response (%d bytes)"), UTF8Response.Length());
 
+	// A client from here on, so the editor stops throttling itself in the
+	// background until the last one leaves. Only after the upgrade: a port probe
+	// or a refused handshake should not move the editor's frame rate. Declared
+	// after Unlist, so it is released first, once every worker has finished.
+	FMCPThrottleClientScope ThrottleClient;
+
 	// Process WebSocket messages
 	UE_LOG(LogMCPBridge, Log, TEXT("[UE-MCP] Starting WebSocket message processing"));
 	ProcessWebSocketMessages(Connection.Get(), PipelinedBytes);
@@ -904,6 +993,11 @@ void FMCPBridgeServer::HandleWebSocketConnection(FMCPSocketHandle ClientSocketFD
 
 void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD, TArray<uint8>& InitialBytes)
 {
+	// Everything that writes to this socket goes through the channel: the
+	// reader's control frames and every worker's answer. See FMCPConnectionChannel.
+	const TSharedRef<FMCPConnectionChannel, ESPMode::ThreadSafe> Channel =
+		MakeShared<FMCPConnectionChannel, ESPMode::ThreadSafe>(ClientSocketFD);
+
 	TArray<uint8> Chunk;
 	Chunk.SetNumUninitialized(MCPWebSocketLimits::kRecvChunkBytes);
 
@@ -927,6 +1021,14 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 
 	while (!bShouldStop)
 	{
+		// A worker that could not deliver its answer found the socket dead.
+		// Nothing more can be delivered on it, so stop reading from it too.
+		if (Channel->bBroken)
+		{
+			bConnectionFinished = true;
+			break;
+		}
+
 		// Decode before reading. Bytes left over from the previous read may
 		// already hold a whole request, and waiting on select first would stall
 		// it until the peer happened to send something else.
@@ -945,7 +1047,7 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 			if (Status == EMCPFrameDecode::ProtocolError)
 			{
 				UE_LOG(LogMCPBridge, Warning, TEXT("[UE-MCP] WebSocket protocol error, closing connection: %s"), *DecodeError);
-				SendCloseFrame(ClientSocketFD, DecodeCloseCode, DecodeError);
+				SendCloseOnChannel(*Channel, DecodeCloseCode, DecodeError);
 				bDone = true;
 				break;
 			}
@@ -974,14 +1076,14 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 					PeerReason.IsEmpty() ? TEXT("") : TEXT(": "),
 					*PeerReason);
 				// Echo the code back to finish the handshake, then stop reading.
-				SendCloseFrame(ClientSocketFD, PeerCode, TEXT(""));
+				SendCloseOnChannel(*Channel, PeerCode, TEXT(""));
 				bDone = true;
 				break;
 			}
 			if (Frame.Opcode == EMCPWebSocketOpcode::Ping)
 			{
 				const TArray<uint8> Pong = CreateControlFrame(EMCPWebSocketOpcode::Pong, Frame.Payload);
-				if (!SendAll(ClientSocketFD, Pong.GetData(), Pong.Num()))
+				if (!SendOnChannel(*Channel, Pong))
 				{
 					bDone = true;
 					break;
@@ -998,7 +1100,7 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 				if (!bAssembling)
 				{
 					UE_LOG(LogMCPBridge, Warning, TEXT("[UE-MCP] Continuation frame with no message in progress"));
-					SendCloseFrame(ClientSocketFD, 1002, TEXT("continuation frame with no message in progress"));
+					SendCloseOnChannel(*Channel, 1002, TEXT("continuation frame with no message in progress"));
 					bDone = true;
 					break;
 				}
@@ -1009,7 +1111,7 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 				if (bAssembling)
 				{
 					UE_LOG(LogMCPBridge, Warning, TEXT("[UE-MCP] New data frame while a fragmented message was still open"));
-					SendCloseFrame(ClientSocketFD, 1002, TEXT("data frame interleaved with an open fragmented message"));
+					SendCloseOnChannel(*Channel, 1002, TEXT("data frame interleaved with an open fragmented message"));
 					bDone = true;
 					break;
 				}
@@ -1026,7 +1128,7 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 					TEXT("message of %lld bytes exceeds the %lld byte bridge limit"),
 					(int64)MessagePayload.Num(), MCPWebSocketLimits::kMaxWebSocketMessageBytes);
 				UE_LOG(LogMCPBridge, Error, TEXT("[UE-MCP] %s"), *Reason);
-				SendCloseFrame(ClientSocketFD, 1009, Reason);
+				SendCloseOnChannel(*Channel, 1009, Reason);
 				bDone = true;
 				break;
 			}
@@ -1050,9 +1152,23 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 				continue;
 			}
 
-			const FString Response = ProcessMessage(Message);
-			const TArray<uint8> ResponseFrame = CreateWebSocketFrame(Response);
-			if (!SendAll(ClientSocketFD, ResponseFrame.GetData(), ResponseFrame.Num()))
+			// At the in-flight bound, hold this request until a worker finishes
+			// rather than start another thread. While the reader waits here it
+			// reads nothing, so the backlog stays in the client's socket buffer
+			// instead of this process.
+			while (Channel->InFlight.GetValue() >= kMaxInFlightPerConnection && !bShouldStop && !Channel->bBroken)
+			{
+				FPlatformProcess::Sleep(0.002f);
+			}
+			if (bShouldStop || Channel->bBroken)
+			{
+				// The bridge is stopping, or the socket died while this request
+				// waited for a slot. It cannot be answered either way; the checks
+				// after this loop say which, and close accordingly.
+				break;
+			}
+
+			if (!DispatchRequest(Channel, MoveTemp(Message)))
 			{
 				UE_LOG(LogMCPBridge, Warning, TEXT("[UE-MCP] Failed to send response frame; closing connection"));
 				bDone = true;
@@ -1060,10 +1176,14 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 			}
 		}
 
-		if (bDone)
+		if (bDone || Channel->bBroken)
 		{
 			bConnectionFinished = true;
 			break;
+		}
+		if (bShouldStop)
+		{
+			break; // not the connection's doing; the shutdown close goes out below
 		}
 
 		fd_set ReadSet;
@@ -1105,17 +1225,114 @@ void FMCPBridgeServer::ProcessWebSocketMessages(FMCPSocketHandle ClientSocketFD,
 				TEXT("(a %lld byte message plus its frame header); no complete frame arrived"),
 				(int64)PendingBytes.Num(), MCPWebSocketLimits::kMaxPendingReceiveBytes, MCPWebSocketLimits::kMaxWebSocketMessageBytes);
 			UE_LOG(LogMCPBridge, Error, TEXT("[UE-MCP] %s"), *Reason);
-			SendCloseFrame(ClientSocketFD, 1009, Reason);
+			SendCloseOnChannel(*Channel, 1009, Reason);
 			bConnectionFinished = true;
 			break;
 		}
 	}
 
+	// Workers write to this socket, and the caller closes it the moment this
+	// function returns, so they are waited out first, whichever way the loop
+	// ended. On shutdown the executor has already been told to stop waiting for
+	// the game thread, so each of them finishes within one wait slice.
+	WaitForChannelWorkers(*Channel);
+
 	if (!bConnectionFinished)
 	{
 		// The only way out of the loop that is not the connection's own doing:
 		// the bridge is stopping. Tell the client so, instead of leaving it to
-		// infer a healthy editor from a severed socket.
-		SendCloseFrame(ClientSocketFD, 1001, TEXT("editor is shutting down"));
+		// infer a healthy editor from a severed socket. After the workers, so
+		// the answers they owed arrive ahead of the close.
+		SendCloseOnChannel(*Channel, 1001, TEXT("editor is shutting down"));
+	}
+}
+
+bool FMCPBridgeServer::SendOnChannel(FMCPConnectionChannel& Channel, const TArray<uint8>& Frame)
+{
+	FScopeLock Lock(&Channel.SendMutex);
+	if (Channel.bCloseSent || Channel.bBroken)
+	{
+		return false;
+	}
+	if (!SendAll(Channel.Socket, Frame.GetData(), Frame.Num()))
+	{
+		Channel.bBroken = true;
+		return false;
+	}
+	return true;
+}
+
+void FMCPBridgeServer::SendCloseOnChannel(FMCPConnectionChannel& Channel, uint16 StatusCode, const FString& Reason)
+{
+	FScopeLock Lock(&Channel.SendMutex);
+	if (Channel.bCloseSent)
+	{
+		return; // one close per connection
+	}
+	Channel.bCloseSent = true;
+	SendCloseFrame(Channel.Socket, StatusCode, Reason);
+}
+
+bool FMCPBridgeServer::DispatchRequest(const TSharedRef<FMCPConnectionChannel, ESPMode::ThreadSafe>& Channel, FString&& Message)
+{
+	if (!bConcurrentDispatch)
+	{
+		const FString Response = ProcessMessage(Message);
+		return SendOnChannel(*Channel, CreateWebSocketFrame(Response));
+	}
+
+	// Counted before the thread exists, so the reader's final wait can never
+	// see zero while a worker is still about to start.
+	Channel->InFlight.Increment();
+
+	// A thread of its own, not the task graph or the global thread pool: the
+	// worker spends nearly all its life blocked on the game thread, and parking
+	// pool workers there would starve the engine's own async work (shader
+	// compiles, asset loading) for as long as the agents stay busy.
+	Async(EAsyncExecution::Thread, [this, Channel, Request = MoveTemp(Message)]()
+	{
+		const FString Response = ProcessMessage(Request);
+		if (!SendOnChannel(*Channel, CreateWebSocketFrame(Response)))
+		{
+			if (Channel->bBroken)
+			{
+				UE_LOG(LogMCPBridge, Warning, TEXT("[UE-MCP] Failed to send response frame; closing connection"));
+			}
+			else
+			{
+				UE_LOG(LogMCPBridge, Log, TEXT("[UE-MCP] Dropped an answer: the connection was already closing"));
+			}
+		}
+		// Last. Once this reaches zero the reader may close the socket and
+		// return, and shutdown may then free this server.
+		Channel->InFlight.Decrement();
+	});
+	return true;
+}
+
+void FMCPBridgeServer::WaitForChannelWorkers(const FMCPConnectionChannel& Channel)
+{
+	if (Channel.InFlight.GetValue() == 0)
+	{
+		return;
+	}
+
+	// No timeout. A worker is inside ProcessMessage, which always returns: the
+	// game-thread wait has its own deadline, and shutdown cuts it to a slice.
+	// Closing the socket before it does would hand the worker a dead handle,
+	// or a live one the operating system has given to someone else.
+	const double WaitStart = FPlatformTime::Seconds();
+	double NextReport = WaitStart + 10.0;
+	while (Channel.InFlight.GetValue() > 0)
+	{
+		FPlatformProcess::Sleep(0.005f);
+		const double Now = FPlatformTime::Seconds();
+		if (Now >= NextReport)
+		{
+			UE_LOG(LogMCPBridge, Log,
+				TEXT("[UE-MCP] Closing connection is waiting for %d request(s) still running (%.0fs so far)"),
+				Channel.InFlight.GetValue(), Now - WaitStart);
+			NextReport = Now + 10.0;
+		}
 	}
 }

@@ -2,7 +2,7 @@ using UnrealBuildTool;
 
 // UBT caches this module's file list and rescans only when this file changes.
 // scripts/deploy.mjs touches it when it deploys a new source file; bump the
-// counter to force a rescan by hand. Rescan counter: 1
+// counter to force a rescan by hand. Rescan counter: 2
 
 public class UE_MCP_Bridge : ModuleRules
 {
