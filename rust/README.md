@@ -120,7 +120,11 @@ The plugin builds on UE 5.5 through 5.8. Code that needs a newer engine API is b
 
 ## Antivirus note
 
-Some antivirus web shields (seen with Avast) inspect localhost HTTP and reset responses of a few MB or less, even with the project folder excluded. A raw-TCP control test showed it isn't the server. If HTTP mode drops large answers, add `http://127.0.0.1:7878/*` to the shield's exceptions or use stdio mode. The test suite runs its large-payload cases over stdio for this reason.
+Some antivirus web shields (seen with Avast) proxy localhost HTTP, and a project-folder exclusion doesn't cover that. On the machine this was built on, the shield:
+- **rewrote responses**: it replaced `Content-Length` with `Transfer-Encoding: chunked` without chunking the body, so strict HTTP clients fail on every reply;
+- **reset multi-MB answers**.
+
+Control tests with a bare TCP server, no ue-mcp-rs code involved, showed the same. Either exclude `127.0.0.1` / the hub's port in the shield, or use **stdio mode**, which isn't affected and is what Claude Code subagents share anyway. The test suite runs its large-payload cases over stdio for this reason.
 
 ## Development
 
@@ -129,6 +133,19 @@ cd rust
 cargo test                # 18 unit + 8 end-to-end tests against a fake editor bridge
 cargo test -- --ignored   # plus the multi-MB HTTP test (fails under such an antivirus)
 ```
+
+Multi-agent smoke test against a real editor (Python stdlib only). Three agents run at once while an observer streams reads:
+- `menu` builds a UMG main menu;
+- `inventory` builds an inventory ActorComponent;
+- `items` builds an interactable item actor and places it in the level.
+
+The test also checks that one agent's lock refuses another agent's edit:
+
+```bash
+python rust/tools/multi_agent_smoke.py --exe rust/target/release/ue-mcp-rs.exe --project tests/ue_mcp/ue_mcp.uproject --start-editor
+```
+
+On UE 5.8.2 it ran 76 calls with 0 errors in 2.2 s wall clock (p50 96 ms, p95 470 ms). The agents' work overlapped 2.8× and was spread evenly over the 4 editor sockets. Assets land under `/Game/MCP_MultiAgent/Run_<time>`. `--transport http` runs one MCP session per agent instead.
 
 `surface/surface.json` is generated from this repository's TypeScript sources without running any of them. Regenerate it after merging upstream:
 
