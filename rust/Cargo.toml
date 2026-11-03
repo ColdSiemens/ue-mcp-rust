@@ -1,0 +1,28 @@
+[package]
+name = "ue-mcp-rust"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-agent MCP hub for the UE-MCP Unreal Engine editor bridge"
+license = "MIT"
+
+[[bin]]
+name = "ue-mcp-rs"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = "0.7"
+clap = { version = "4", features = ["derive", "env"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = "0.10"
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "=0.24.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
