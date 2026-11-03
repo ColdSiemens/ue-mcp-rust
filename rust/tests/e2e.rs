@@ -22,6 +22,13 @@ use tokio_tungstenite::tungstenite::Message;
 
 const PLUGIN_MAX_INBOUND: usize = 64 * 1024 * 1024;
 
+/// get_status answers without waiting for the editor, so a test that counts
+/// sockets polls it until every one is up.
+fn all_sockets_up(status: &str) -> bool {
+    let v: Value = serde_json::from_str(status).unwrap();
+    v["editor"]["connections"].as_array().is_some_and(|c| c.iter().all(|s| s["connected"] == true))
+}
+
 // ── Fake editor bridge ──────────────────────────────────────────────────────
 
 #[derive(Default)]
@@ -272,7 +279,11 @@ async fn pool_runs_calls_in_parallel_against_a_serial_plugin() {
     let fake = FakeBridge::start(0).await;
     let hub = Hub::start(fake.port).await;
     let client = hub.client("").await;
-    client.call("project", "get_status", json!({})).await; // connected and warmed up
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while !all_sockets_up(&client.call("project", "get_status", json!({})).await.1) {
+        assert!(Instant::now() < deadline, "the sockets never came up");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 
     let started = Instant::now();
     let calls = (0..8).map(|i| {
@@ -444,9 +455,17 @@ async fn stdio_serves_subagents_concurrently() {
     let init: Value = serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
     assert_eq!(init["result"]["protocolVersion"], "2025-03-26");
     stdin.write_all(send(json!({ "jsonrpc": "2.0", "method": "notifications/initialized" })).as_bytes()).await.unwrap();
-    // Warm up: the first call waits for the sockets.
-    stdin.write_all(send(json!({ "jsonrpc": "2.0", "id": 99, "method": "tools/call", "params": { "name": "project", "arguments": { "action": "get_status" } } })).as_bytes()).await.unwrap();
-    lines.next_line().await.unwrap().unwrap();
+    // Warm up: every socket connected before the clock starts.
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        stdin.write_all(send(json!({ "jsonrpc": "2.0", "id": 99, "method": "tools/call", "params": { "name": "project", "arguments": { "action": "get_status" } } })).as_bytes()).await.unwrap();
+        let reply: Value = serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
+        if all_sockets_up(reply["result"]["content"][0]["text"].as_str().unwrap()) {
+            break;
+        }
+        assert!(Instant::now() < deadline, "the sockets never came up");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 
     let started = Instant::now();
     for i in 1..=4 {

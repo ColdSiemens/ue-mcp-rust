@@ -203,10 +203,15 @@ impl Hub {
             Some(Value::String(s)) => s,
             _ => return ToolResult::error(format!("{name}: 'action' is required, e.g. {name}(action=\"{}\", args={{...}})", tool.actions[0].name)),
         };
-        let view = self.effective_view(session);
         let Some(action) = tool.action(&action_name) else {
             return ToolResult::error(unknown_action(tool, &action_name));
         };
+        // A new session's first call can arrive before its sockets are up; the
+        // guard below needs the plugin's handshake, so give it a moment.
+        if !matches!(action.dispatch, Dispatch::Local) && !self.bridge.is_connected() {
+            self.bridge.wait_connected(Duration::from_secs(2)).await;
+        }
+        let view = self.effective_view(session);
         // Guard: never send an editor a method its plugin build does not have.
         // Version-gated handlers are simply not registered on older engines.
         if !view.allows_action(action) {

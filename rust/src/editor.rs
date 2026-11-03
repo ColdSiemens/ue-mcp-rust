@@ -13,6 +13,8 @@ use crate::dispatch::Hub;
 
 const DEFAULT_START_TIMEOUT_SECS: f64 = 300.0;
 const STOP_TIMEOUT: Duration = Duration::from_secs(120);
+/// How long a new session gives its sockets to find an editor that is already running.
+const EXISTING_EDITOR_WAIT: Duration = Duration::from_secs(3);
 const DEFAULT_BUILD_TIMEOUT_MS: u64 = 60 * 60 * 1000;
 
 #[derive(Debug, Clone)]
@@ -159,7 +161,9 @@ impl Hub {
     }
 
     pub async fn start_editor(&self, p: &Map<String, Value>) -> Result<Value, String> {
-        if self.bridge.is_connected() {
+        // A new session's sockets may still be connecting to an editor that is
+        // already up; launching then would open the project twice.
+        if self.bridge.wait_connected(EXISTING_EDITOR_WAIT).await {
             return Ok(json!({
                 "success": false,
                 "alreadyRunning": true,
@@ -230,7 +234,7 @@ impl Hub {
     }
 
     pub async fn stop_editor(&self) -> Result<Value, String> {
-        if !self.bridge.is_connected() {
+        if !self.bridge.wait_connected(EXISTING_EDITOR_WAIT).await {
             return Ok(json!({ "success": false, "alreadyStopped": true, "message": "No editor of this project is connected." }));
         }
         let pid = self
@@ -276,7 +280,7 @@ impl Hub {
 
     /// Build the project's editor target with UnrealBuildTool.
     pub async fn build_project(&self, p: &Map<String, Value>, timeout_ms: Option<u64>) -> Result<Value, String> {
-        if self.bridge.is_connected() {
+        if self.bridge.wait_connected(EXISTING_EDITOR_WAIT).await {
             return Err(
                 "The editor is running, and building while it is open fails on its locked DLLs. Stop it with editor(stop_editor) first, or compile in place with project(live_coding_compile)."
                     .into(),
