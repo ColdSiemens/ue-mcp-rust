@@ -1,7 +1,7 @@
 # UE-MCP
 
 > **About this fork:** it adds two things for running many AI agents against one editor:
-> - [`rust/`](rust/README.md): a Rust MCP server that pools editor sockets, keeps per-agent asset locks, and trims the tool list.
+> - [`rust/`](rust/README.md): a Rust MCP server that pools editor sockets, keeps per-agent asset locks, and trims the tool list. Prebuilt binaries are on this fork's Releases page (`rust-v*` tags), so no Rust toolchain is needed.
 > - A [bridge plugin change](rust/PLUGIN-PATCH.md) that runs requests concurrently on each socket and stops background throttling while a client is connected.
 >
 > Everything else follows upstream [db-lyon/ue-mcp](https://github.com/db-lyon/ue-mcp).

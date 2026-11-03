@@ -1,10 +1,12 @@
 mod bridge;
 mod config;
 mod dispatch;
+mod editor;
 mod epic;
 mod http;
 mod locks;
 mod mcp;
+mod project_files;
 mod stdio;
 mod surface;
 
@@ -67,6 +69,16 @@ struct Cli {
     /// Seconds a call waits for the editor to come up before failing.
     #[arg(long, default_value_t = 15)]
     connect_wait: u64,
+
+    /// Engine folder (the one holding Engine/) for start_editor and builds.
+    /// Default: found from the .uproject's EngineAssociation.
+    #[arg(long, env = "UE_ENGINE_ROOT")]
+    engine_root: Option<PathBuf>,
+
+    /// Extra argument for editors started by start_editor; repeat for several.
+    /// e.g. --editor-arg=-ini:EditorSettings:[/Script/UnrealEd.EditorPerformanceSettings]:bThrottleCPUWhenNotForeground=False
+    #[arg(long = "editor-arg", allow_hyphen_values = true)]
+    editor_args: Vec<String>,
 }
 
 #[tokio::main]
@@ -98,6 +110,8 @@ async fn main() -> anyhow::Result<()> {
         enforce_locks: !cli.no_lock_enforcement,
         hide_epic: cli.no_epic,
         hide_unregistered: !cli.show_unregistered,
+        engine_root: cli.engine_root,
+        editor_args: cli.editor_args,
     };
     let hub = Arc::new(Hub::new(bridge, surface, opts, project));
     let view = View {

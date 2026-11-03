@@ -24,16 +24,15 @@ One limit can't be removed: Unreal runs editor operations on its single game thr
 
 > The plugin change has **not been compiled yet**: no Unreal toolchain was available while writing it. Rebuild the editor and check that `get_bridge_capabilities` lists `concurrent-dispatch`. If the build fails, restore the `.orig` files. The Rust server works with an unpatched plugin too, just with less concurrency.
 
-**2. Build the server**
+**2. Get the server.** No Rust needed: each `rust-v*` release on this fork's Releases page carries prebuilt binaries for Windows, macOS and Linux. On Windows, this downloads the newest one and registers it for your project:
 
-```bash
-cd rust
-cargo build --release
+```powershell
+.\rust\install.ps1 -Project C:\Path\To\MyGame.uproject
 ```
 
-The binary is `rust/target/release/ue-mcp-rs.exe` (~6 MB, no runtime needed).
+It installs to `%LOCALAPPDATA%\ue-mcp-rs\ue-mcp-rs.exe`; run it again to update. To build from source instead: `cd rust` then `cargo build --release`, which gives `rust/target/release/ue-mcp-rs.exe`.
 
-**3. Register it with Claude Code.** Remove any Node `ue-mcp` entry first so agents don't see every tool twice.
+**3. Register it with Claude Code** (`install.ps1 -Project` already did this). Remove any Node `ue-mcp` entry first so agents don't see every tool twice.
 
 Option A, stdio: one Claude Code session and its subagents.
 
@@ -76,6 +75,7 @@ Example subagent brief:
 | `--no-epic` | off | Hide the 830 `epic_*` wrappers of Unreal 5.8's own toolsets. |
 | `--tools a,b` | all | Only these categories (`project` is always included). |
 | `--bridge-port P` / `UE_MCP_PORT` | auto | Skip port discovery. |
+| `--engine-root DIR` / `UE_ENGINE_ROOT` | auto | Engine folder for `start_editor` and builds. Default: the `.uproject`'s EngineAssociation (launcher version, registered source build, or path). `UE_EDITOR_PATH` names the editor exe directly. |
 | `--agent NAME` / `UE_MCP_AGENT` | random | Lock owner for the stdio session. |
 | `--no-lock-enforcement` | off | Allow mutating assets other agents locked. |
 | `--show-unregistered` | off | Advertise actions the running plugin doesn't register. |
@@ -99,14 +99,24 @@ Tool-list size, as measured:
   - `asset`: `lock`, `unlock`, `unlock_all`, `search`, `migrate`
   - `blueprint(author)`, `niagara(batch)`, `pcg(wait_for_generation)` (and `wait:true` on `pcg(execute/force_regenerate)`)
   - `editor`: `get_engine_state`, `execute_python` (ungated), `play_in_editor_ignore_blueprint_errors`
-  - `project`: `get_status`, `get_info`, `describe_action`, `list_available_actions`, `search_tools`
+  - `project`: `get_status`, `get_info`, `describe_action`, `list_available_actions`, `search_tools`, `read_config`, `search_config`, `list_config_tags`, `build`
+  - `editor`: `start_editor` (launches detached, waits for the bridge to report ready), `stop_editor` (the editor quits itself and raises its own save prompt), `restart_editor`, `request_editor_shutdown`, `build_project` (UnrealBuildTool, refused while the editor runs)
 - **Not ported** (removed from the advertised surface; the Node server still has them):
-  - editor start, stop and build
   - checkpoints
   - flows and feedback
   - npm plugin introspection
   - multi-editor routing
   - C++ source, config and engine-index tools (agents have their own file and shell tools for these)
+
+## Engine versions
+
+The plugin builds on UE 5.5 through 5.8. Code that needs a newer engine API is behind a version check, and a handler whose API is missing is not registered at all on that engine. The server reads the running plugin's handler list and engine version when it connects, then:
+
+- hides actions the editor can't run from `tools/list`, so agents aren't offered them;
+- refuses a call to one with a message naming the engine version, without sending anything to the editor;
+- reports `availableInRunningEditor` in `project(describe_action)` and `engineVersion` in `project(get_status)`.
+
+`--show-unregistered` turns the hiding and refusing off.
 
 ## Antivirus note
 
@@ -116,7 +126,7 @@ Some antivirus web shields (seen with Avast) inspect localhost HTTP and reset re
 
 ```bash
 cd rust
-cargo test                # 15 unit + 7 end-to-end tests against a fake editor bridge
+cargo test                # 18 unit + 8 end-to-end tests against a fake editor bridge
 cargo test -- --ignored   # plus the multi-MB HTTP test (fails under such an antivirus)
 ```
 

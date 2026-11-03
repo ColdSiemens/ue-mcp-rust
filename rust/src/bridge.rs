@@ -146,6 +146,11 @@ impl Bridge {
         self.caps.lock().unwrap().concurrent
     }
 
+    /// The running editor's engine version, e.g. "5.5.4-40574608+++UE5+Release-5.5".
+    pub fn engine_version(&self) -> Option<String> {
+        self.capabilities().and_then(|c| c.get("engineVersion").and_then(Value::as_str).map(str::to_string))
+    }
+
     /// Wait until at least one socket is up, or the timeout passes.
     pub async fn wait_connected(&self, within: Duration) -> bool {
         let deadline = tokio::time::Instant::now() + within;
@@ -180,6 +185,8 @@ impl Bridge {
             "connected": self.is_connected(),
             "portCandidates": self.resolver.candidates(),
             "concurrentDispatch": self.concurrent_dispatch(),
+            "engineVersion": caps.as_ref().and_then(|c| c.get("engineVersion").cloned()),
+            "editorProject": caps.as_ref().and_then(|c| c.get("projectName").cloned()),
             "pluginProtocolVersion": caps.as_ref().and_then(|c| c.get("protocolVersion").cloned()),
             "pluginActionCount": caps.as_ref().and_then(|c| c.get("actionCount").cloned()),
             "pluginFeatures": caps.as_ref().and_then(|c| c.get("features").cloned()),

@@ -24,7 +24,8 @@ Working alongside other agents:
 - A timed-out mutation may still have landed: read before retrying.
 - Optional routing args: timeoutMs (raise the wait for long operations), select / omit (trim result fields).
 
-Not available in this hub: editor start/stop/build, checkpoints, flows, C++ source tools. Use your own file and shell tools for source code.";
+Editor lifecycle: editor(start_editor) launches the editor and waits until it is ready; editor(stop_editor) asks it to quit (it raises its own save prompt); editor(build_project) compiles C++ with the editor closed, project(live_coding_compile) with it open.
+Not available in this hub: checkpoints, flows, C++ source and engine-index tools. Use your own file and shell tools for source code.";
 
 pub fn negotiate(requested: Option<&str>) -> &'static str {
     requested.and_then(|r| SUPPORTED_PROTOCOLS.iter().find(|p| **p == r).copied()).unwrap_or(LATEST_PROTOCOL)

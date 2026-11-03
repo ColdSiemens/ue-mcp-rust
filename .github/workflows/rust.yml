@@ -1,0 +1,73 @@
+# Builds the Rust MCP server (rust/) on every change, and publishes prebuilt
+# binaries as a GitHub Release when a rust-v* tag is pushed, so nobody needs
+# a Rust toolchain to run it.
+name: Rust server
+
+on:
+  push:
+    branches: [rust-hub]
+    paths: ["rust/**", ".github/workflows/rust.yml"]
+    tags: ["rust-v*"]
+  pull_request:
+    paths: ["rust/**", ".github/workflows/rust.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            exe: ue-mcp-rs.exe
+            archive: ue-mcp-rs-windows-x64.zip
+          - os: macos-latest
+            exe: ue-mcp-rs
+            archive: ue-mcp-rs-macos-arm64.tar.gz
+          - os: ubuntu-latest
+            exe: ue-mcp-rs
+            archive: ue-mcp-rs-linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rust
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Test
+        run: cargo test --locked --release
+      - name: Build
+        run: cargo build --locked --release
+      - name: Package
+        run: |
+          mkdir dist
+          cp "target/release/${{ matrix.exe }}" README.md ../LICENSE dist/
+          cd dist
+          if [[ "${{ matrix.archive }}" == *.zip ]]; then 7z a "../${{ matrix.archive }}" ./*; else tar czf "../${{ matrix.archive }}" ./*; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: rust/${{ matrix.archive }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/rust-v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ue-mcp-rs ${GITHUB_REF_NAME#rust-v}" \
+            --notes "Prebuilt ue-mcp-rs MCP server; no Rust toolchain needed. Windows: run rust/install.ps1, or unzip ue-mcp-rs-windows-x64.zip and register the exe with claude mcp add. See rust/README.md."

@@ -90,7 +90,8 @@ async fn serve_socket(stream: TcpStream, st: Arc<FakeState>, methods: Arc<Vec<St
         let req: Value = serde_json::from_str(&text).unwrap();
         let params = req["params"].clone();
         let result = match req["method"].as_str().unwrap() {
-            "get_bridge_capabilities" => json!({ "protocolVersion": 3, "features": [], "actionCount": methods.len(), "actions": *methods }),
+            "get_bridge_capabilities" => json!({ "protocolVersion": 3, "engineVersion": "5.5.4-40574608+++UE5+Release-5.5", "features": [], "actionCount": methods.len(), "actions": *methods }),
+            "read_blueprint" => panic!("the hub sent a method the plugin does not register"),
             "get_engine_state" => json!({ "success": true, "gameThread": "idle", "servedWithoutGameThread": true }),
             "acquire_lock" => {
                 let path = params["assetPath"].as_str().unwrap().to_lowercase();
@@ -465,5 +466,25 @@ async fn subagents_sharing_one_stdio_session_keep_separate_locks() {
     let (err, text) = hub.call("level", "place_actor", json!({ "assetPath": level, "actorClass": "A", "agent": "lighting" })).await;
     assert!(!err, "{text}");
     assert!(!text.contains("\"agent\""), "routing arg must not reach the editor: {text}");
+    fake.stop();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn actions_the_editor_lacks_are_refused_without_a_round_trip() {
+    let fake = FakeBridge::start(0).await;
+    let mut hub = StdioHub::start(fake.port).await;
+    hub.call("project", "get_status", json!({})).await; // capabilities known
+
+    let (err, text) = hub.call("blueprint", "read", json!({ "assetPath": "/Game/BP_Door" })).await;
+    assert!(err, "{text}");
+    assert!(text.contains("not available in the running editor (UE 5.5.4"), "{text}");
+    assert!(text.contains("read_blueprint"), "{text}");
+
+    let (_, text) = hub.call("project", "describe_action", json!({ "name": "blueprint.read" })).await;
+    let described: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(described["availableInRunningEditor"], false);
+    let (_, text) = hub.call("project", "describe_action", json!({ "name": "blueprint.add_variable" })).await;
+    let described: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(described["availableInRunningEditor"], true);
     fake.stop();
 }

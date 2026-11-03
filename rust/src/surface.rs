@@ -33,6 +33,15 @@ pub const LOCAL_ACTIONS: &[(&str, &str)] = &[
     ("project", "describe_action"),
     ("project", "list_available_actions"),
     ("project", "search_tools"),
+    ("editor", "start_editor"),
+    ("editor", "stop_editor"),
+    ("editor", "restart_editor"),
+    ("editor", "request_editor_shutdown"),
+    ("editor", "build_project"),
+    ("project", "build"),
+    ("project", "read_config"),
+    ("project", "search_config"),
+    ("project", "list_config_tags"),
 ];
 
 /// Signature lines rewritten because this hub's version takes different args.

@@ -11,6 +11,7 @@ use crate::bridge::{Bridge, BridgeError};
 use crate::config::Project;
 use crate::epic;
 use crate::locks::{self, LockTable};
+use crate::project_files;
 use crate::surface::{Action, Dispatch, Effect, Surface, Tool, View};
 
 /// What the plugin waits for a handler that registered no timeout of its own.
@@ -25,6 +26,11 @@ pub struct HubOptions {
     pub enforce_locks: bool,
     pub hide_epic: bool,
     pub hide_unregistered: bool,
+    /// Engine folder for start_editor and builds, when the .uproject's
+    /// EngineAssociation does not lead to one.
+    pub engine_root: Option<std::path::PathBuf>,
+    /// Extra command-line arguments start_editor passes after the .uproject.
+    pub editor_args: Vec<String>,
 }
 
 /// One MCP client: an agent, or a whole Claude Code process over stdio.
@@ -173,6 +179,11 @@ impl Hub {
         let Some(action) = tool.action(&action_name).filter(|a| !(view.hide_epic && a.is_epic())) else {
             return ToolResult::error(unknown_action(tool, &action_name));
         };
+        // Guard: never send an editor a method its plugin build does not have.
+        // Version-gated handlers are simply not registered on older engines.
+        if !view.allows_action(action) {
+            return ToolResult::error(self.unavailable_message(tool, action));
+        }
         let routing = Routing::take(&mut params);
         let owner = routing.agent.clone().unwrap_or_else(|| session.owner.clone());
         self.coerce_json_strings(action, &mut params);
@@ -217,6 +228,16 @@ impl Hub {
             }
             Err(msg) => ToolResult::error(msg),
         }
+    }
+
+    fn unavailable_message(&self, tool: &Tool, action: &Action) -> String {
+        let engine = self.bridge.engine_version().map(|v| format!("UE {v}")).unwrap_or_else(|| "this engine version".into());
+        format!(
+            "{}.{} is not available in the running editor ({engine}): its UE_MCP_Bridge build does not register '{}'. The engine API it needs is newer than this version, or the plugin is older than this server. Nothing was sent to the editor; project(action=\"search_tools\") finds alternatives.",
+            tool.name,
+            action.name,
+            action.bridge_method().unwrap_or("?")
+        )
     }
 
     /// Strings holding JSON where the handler declares an array or object, which models often send.
@@ -337,7 +358,16 @@ impl Hub {
                         "error": format!("no action named '{name}'"),
                         "closest": self.surface.search(name, &session.view, 8),
                     })),
-                    1 => Ok(self.surface.describe(hits[0].0, hits[0].1)),
+                    1 => {
+                        let (t, a) = hits[0];
+                        let mut out = self.surface.describe(t, a);
+                        if self.bridge.registered_methods().is_some() {
+                            let reg = View { registered: self.bridge.registered_methods(), ..View::default() };
+                            out["availableInRunningEditor"] = json!(reg.allows_action(a));
+                            out["engineVersion"] = json!(self.bridge.engine_version());
+                        }
+                        Ok(out)
+                    }
                     _ => Ok(json!({
                         "ambiguous": true,
                         "matches": hits.iter().map(|(t, a)| json!({ "call": format!("{}.{}", t.name, a.name), "signature": a.signature })).collect::<Vec<_>>(),
@@ -374,6 +404,26 @@ impl Hub {
                 let limit = p.get("limit").and_then(Value::as_u64).unwrap_or(10).clamp(1, 50) as usize;
                 Ok(json!({ "query": query, "results": self.surface.search(query, &self.effective_view(session), limit) }))
             }
+            ("editor", "start_editor") => self.start_editor(&p).await,
+            ("editor", "stop_editor") => self.stop_editor().await,
+            ("editor", "restart_editor") => self.restart_editor(&p).await,
+            ("editor", "request_editor_shutdown") => {
+                let flag = |k: &str| p.get(k).and_then(Value::as_bool).unwrap_or(true);
+                let forwarded = json!({ "requireClean": flag("requireClean"), "endPIE": flag("endPIE") });
+                self.bridge_call("request_editor_shutdown", forwarded, None).await
+            }
+            ("editor", "build_project") | ("project", "build") => self.build_project(&p, routing.timeout_ms).await,
+            ("project", "read_config") => {
+                let project = self.project.as_ref().ok_or("no project loaded")?;
+                let name = p.get("configName").and_then(Value::as_str).ok_or("read_config needs configName, e.g. \"Engine\"")?;
+                project_files::read_config(project, name)
+            }
+            ("project", "search_config") => {
+                let project = self.project.as_ref().ok_or("no project loaded")?;
+                let query = p.get("query").and_then(Value::as_str).ok_or("search_config needs query")?;
+                project_files::search_config(project, query)
+            }
+            ("project", "list_config_tags") => project_files::list_config_tags(self.project.as_ref().ok_or("no project loaded")?),
             (t, a) => Err(format!("{t}({a}) is not available in ue-mcp-rust")),
         }
     }
