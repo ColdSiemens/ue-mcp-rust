@@ -69,7 +69,8 @@ namespace MCPAudio
 	{
 		return MCPUnsupportedEngineError(
 			FString::Printf(TEXT("audio(%s)"), Action), TEXT("5.5"),
-			TEXT("The MetaSound document model it drives (graph pages and the document builder registry) does not exist in 5.4."));
+			TEXT("The MetaSound document model it drives (graph pages and the document builder registry) does not exist in 5.4. ")
+			TEXT("On 5.4, author the MetaSound in its own editor, or build the sound as a SoundCue through the audio cue actions."));
 	}
 	/** Reparent a sound class on both ends. SetParentClass only drops the class
 	 *  from the old parent's ChildClasses; the new parent's list is ours to fill. */
@@ -81,11 +82,7 @@ namespace MCPAudio
 			OldParent->Modify();
 			OldParent->ChildClasses.Remove(Class);
 		}
-#if WITH_EDITOR
 		Class->SetParentClass(NewParent);
-#else
-		Class->ParentClass = NewParent;
-#endif
 		if (NewParent)
 		{
 			NewParent->Modify();
@@ -143,7 +140,6 @@ namespace MCPAudio
 		{
 			Parent->ChildNodes[Index] = nullptr;
 		}
-#if WITH_EDITORONLY_DATA
 		if (UEdGraphNode* GraphNode = Parent->GetGraphNode())
 		{
 			int32 InputIndex = 0;
@@ -160,7 +156,6 @@ namespace MCPAudio
 				break;
 			}
 		}
-#endif
 	}
 
 #if UE_MCP_HAS_5_5_API && !UE_MCP_HAS_5_8_API

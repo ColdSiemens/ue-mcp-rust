@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @session per-session: Wires the registry, the per-session loads and the MCP server together.
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { error, info, warn } from "./core/log.js";
 import { resolveServerMode } from "./daemon/server-mode.js";
@@ -6,6 +7,7 @@ import { startVersionCheck } from "./core/version-check.js";
 import { startFlowHttpServer } from "./flow/http-server.js";
 import { packageVersion } from "./core/package-root.js";
 import { formatTopLevelUsage, routeTopLevel, runCliCommand } from "./cli/cli-commands.js";
+import { guardFetchExitAbort } from "./cli/cli-main.js";
 import { createRuntime } from "./server/runtime.js";
 import { createMcpServer } from "./server/mcp-server.js";
 
@@ -25,7 +27,7 @@ async function main() {
   // Opt-in via `ue-mcp.http`; binds to 127.0.0.1 only.
   if (rt.project.config.http?.enabled) {
     try {
-      startFlowHttpServer(rt.flowTool, rt.baseCtx, {
+      startFlowHttpServer(rt.flowRequest, {
         port: rt.project.config.http.port,
         host: rt.project.config.http.host,
       });
@@ -42,6 +44,8 @@ async function main() {
   // kill timeout. A server also serving flows over HTTP stays up for those.
   if (!rt.project.config.http?.enabled) process.stdin.once("end", () => process.exit(0));
 }
+
+guardFetchExitAbort();
 
 // A first argument naming a command runs it; help and stray flags print usage;
 // anything else starts the server.

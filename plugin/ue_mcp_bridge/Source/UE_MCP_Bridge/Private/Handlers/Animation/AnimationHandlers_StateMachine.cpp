@@ -67,14 +67,6 @@
 #include "Dom/JsonValue.h"
 
 
-// UPoseSearchDatabase's GetNumAnimationAssets / GetDatabaseAnimationAsset pair
-// is 5.5 and newer. 5.4 exposes the clip list as the AnimationAssets array of
-// FInstancedStruct with GetAnimationAssetBase, which is what the #else arms
-// below are written against. The unified FPoseSearchDatabaseAnimationAsset
-// clip struct is separate: 5.7+ (5.8 deprecates the per-type structs at 5.7;
-// 5.5.4 has only those), so clip authoring gates on UE_MCP_HAS_5_7_API.
-#define UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API UE_MCP_HAS_5_5_API
-
 #if UE_MCP_HAS_5_8_API
 static TSharedPtr<FJsonObject> AnimationTransformToJson(const FTransform& Value)
 {
@@ -228,12 +220,10 @@ static FPoseSearchClipFlags ParsePoseSearchClipFlags(const TSharedPtr<FJsonObjec
 #if UE_MCP_HAS_5_7_API
 static void ApplyPoseSearchClipFlags(FPoseSearchDatabaseAnimationAsset& Entry, const FPoseSearchClipFlags& Flags)
 {
-#if WITH_EDITORONLY_DATA
 	if (Flags.bEnabled.IsSet()) Entry.bEnabled = Flags.bEnabled.GetValue();
 	if (Flags.bDisableReselection.IsSet()) Entry.bDisableReselection = Flags.bDisableReselection.GetValue();
 	if (Flags.MirrorOption.IsSet()) Entry.MirrorOption = Flags.MirrorOption.GetValue();
 	if (Flags.SamplingRange.IsSet()) Entry.SamplingRange = Flags.SamplingRange.GetValue();
-#endif
 }
 #elif UE_MCP_HAS_POSESEARCH_DATABASE_ASSET_API
 // Before 5.7 each clip type is its own struct: the shared flags sit on the base,
@@ -1453,7 +1443,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::CreateIKRig(const TSharedPtr<FJsonObj
 	UFactory* Factory = NewObject<UFactory>(GetTransientPackage(), FindObject<UClass>(nullptr, TEXT("/Script/IKRigEditor.IKRigDefinitionFactory")));
 	if (!Factory)
 	{
-		return MCPError(TEXT("IKRigDefinitionFactory not found - is the IKRig plugin enabled?"));
+		return MCPPluginUnavailableError(TEXT("IKRigDefinitionFactory"), TEXT("IKRig"));
 	}
 
 	auto Created = MCPCreateAssetIdempotent<UIKRigDefinition>(Name, PackagePath, OnConflict, TEXT("IKRigDefinition"), Factory);
@@ -1533,31 +1523,6 @@ TSharedPtr<FJsonValue> FAnimationHandlers::CreateIKRig(const TSharedPtr<FJsonObj
 }
 
 // ─── #93  read_ik_rig ───────────────────────────────────────────────
-
-// The IK rig's retarget root bone, whatever the accessor is called.
-//
-// 5.4 spells it GetRetargetRoot(); later engines renamed the same accessor over
-// the same FName to GetPelvis(). Which engine did the rename is not something
-// this file has to know: the first overload drops out of the overload set when
-// GetPelvis does not exist, and the second when GetRetargetRoot does not, so
-// whichever the engine has is the one that gets called.
-template <typename RigType>
-static auto MCPIKRigRetargetRootBoneImpl(const RigType* Rig, int) -> decltype(Rig->GetPelvis())
-{
-	return Rig->GetPelvis();
-}
-
-template <typename RigType>
-static auto MCPIKRigRetargetRootBoneImpl(const RigType* Rig, long) -> decltype(Rig->GetRetargetRoot())
-{
-	return Rig->GetRetargetRoot();
-}
-
-template <typename RigType>
-static FName MCPIKRigRetargetRootBone(const RigType* Rig)
-{
-	return Rig ? MCPIKRigRetargetRootBoneImpl(Rig, 0) : NAME_None;
-}
 
 TSharedPtr<FJsonValue> FAnimationHandlers::ReadIKRig(const TSharedPtr<FJsonObject>& Params)
 {
@@ -1746,12 +1711,12 @@ TSharedPtr<FJsonValue> FAnimationHandlers::CreateIKRetargeter(const TSharedPtr<F
 	UClass* FactoryClass = FindObject<UClass>(nullptr, TEXT("/Script/IKRigEditor.IKRetargetFactory"));
 	if (!FactoryClass)
 	{
-		return MCPError(TEXT("IKRetargetFactory not found - is the IKRig plugin enabled?"));
+		return MCPPluginUnavailableError(TEXT("IKRetargetFactory"), TEXT("IKRig"));
 	}
 	UClass* RetargeterClass = FindObject<UClass>(nullptr, TEXT("/Script/IKRig.IKRetargeter"));
 	if (!RetargeterClass)
 	{
-		return MCPError(TEXT("IKRetargeter class not found"));
+		return MCPPluginUnavailableError(TEXT("IKRetargeter class"), TEXT("IKRig"));
 	}
 	UFactory* Factory = NewObject<UFactory>(GetTransientPackage(), FactoryClass);
 
@@ -2568,7 +2533,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::SetIKRigMesh(const TSharedPtr<FJsonOb
 	if (auto Err = RequireString(Params, TEXT("meshPath"), MeshPath)) return Err;
 	if (MCPIsProtectedAssetPath(RigPath))
 	{
-		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s"), *RigPath));
+		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s. %s"), *RigPath, *MCPProtectedMountWayForward()));
 	}
 
 	UIKRigDefinition* IKRig = LoadAssetByPath<UIKRigDefinition>(RigPath);
@@ -2629,7 +2594,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::SetIKRetargeterRig(const TSharedPtr<F
 	const FString Side = OptionalString(Params, TEXT("side"), TEXT("target"));
 	if (MCPIsProtectedAssetPath(RetargeterPath))
 	{
-		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s"), *RetargeterPath));
+		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s. %s"), *RetargeterPath, *MCPProtectedMountWayForward()));
 	}
 	if (!Side.Equals(TEXT("source"), ESearchCase::IgnoreCase)
 		&& !Side.Equals(TEXT("target"), ESearchCase::IgnoreCase))
@@ -2763,7 +2728,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::AutoAlignRetargetPose(const TSharedPt
 	const FString Side = OptionalString(Params, TEXT("side"), TEXT("target"));
 	if (MCPIsProtectedAssetPath(RetargeterPath))
 	{
-		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s"), *RetargeterPath));
+		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s. %s"), *RetargeterPath, *MCPProtectedMountWayForward()));
 	}
 	// ParseSourceOrTarget maps anything that is not 'source' to Target, so an
 	// unrecognised side used to succeed silently and then be echoed into a
@@ -2835,7 +2800,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::ResetRetargetPose(const TSharedPtr<FJ
 	const FString Side = OptionalString(Params, TEXT("side"), TEXT("target"));
 	if (MCPIsProtectedAssetPath(RetargeterPath))
 	{
-		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s"), *RetargeterPath));
+		return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s. %s"), *RetargeterPath, *MCPProtectedMountWayForward()));
 	}
 	// ParseSourceOrTarget maps anything that is not 'source' to Target, so an
 	// unrecognised side used to succeed silently and then be echoed into a
@@ -2911,7 +2876,7 @@ namespace MCPRetargetPoseEdit
 	{
 		if (MCPIsProtectedAssetPath(RetargeterPath))
 		{
-			return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s"), *RetargeterPath));
+			return MCPError(FString::Printf(TEXT("Protected asset cannot be modified: %s. %s"), *RetargeterPath, *MCPProtectedMountWayForward()));
 		}
 		if (!Side.Equals(TEXT("source"), ESearchCase::IgnoreCase) && !Side.Equals(TEXT("target"), ESearchCase::IgnoreCase))
 		{
@@ -2942,7 +2907,8 @@ TSharedPtr<FJsonValue> FAnimationHandlers::RemoveRetargetPose(const TSharedPtr<F
 {
 	MCPReadParamsAhead(Params, { TEXT("retargeterPath"), TEXT("poseName"), TEXT("side") });
 #if !UE_MCP_HAS_5_7_API
-	return MCPUnsupportedEngineError(TEXT("remove_retarget_pose"), TEXT("5.7"));
+	return MCPUnsupportedEngineError(TEXT("remove_retarget_pose"), TEXT("5.7"),
+		TEXT("On this engine, remove the pose in the IK Retargeter editor"));
 #else
 	using namespace MCPRetargetPoseEdit;
 	FString RetargeterPath;
@@ -3021,7 +2987,8 @@ TSharedPtr<FJsonValue> FAnimationHandlers::RenameRetargetPose(const TSharedPtr<F
 {
 	MCPReadParamsAhead(Params, { TEXT("retargeterPath"), TEXT("poseName"), TEXT("newName"), TEXT("side") });
 #if !UE_MCP_HAS_5_7_API
-	return MCPUnsupportedEngineError(TEXT("rename_retarget_pose"), TEXT("5.7"));
+	return MCPUnsupportedEngineError(TEXT("rename_retarget_pose"), TEXT("5.7"),
+		TEXT("On this engine, rename the pose in the IK Retargeter editor"));
 #else
 	using namespace MCPRetargetPoseEdit;
 	FString RetargeterPath;
@@ -3103,7 +3070,8 @@ TSharedPtr<FJsonValue> FAnimationHandlers::BatchRetargetAnimations(const TShared
 		TEXT("prefix"), TEXT("suffix"), TEXT("overwrite"), TEXT("requireCompleteMapping"),
 	});
 #if !UE_MCP_HAS_5_8_API
-	return MCPUnsupportedEngineError(TEXT("batch_retarget_animations"), TEXT("5.8"));
+	return MCPUnsupportedEngineError(TEXT("batch_retarget_animations"), TEXT("5.8"),
+		TEXT("On this engine, use Export Selected Animations in the IK Retargeter editor"));
 #else
 	FString RetargeterPath;
 	if (auto Err = RequireString(Params, TEXT("retargeterPath"), RetargeterPath)) return Err;
@@ -3175,7 +3143,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::BatchRetargetAnimations(const TShared
 	const FString TargetPath = OptionalString(Params, TEXT("outputPath"));
 	if (!TargetPath.IsEmpty() && MCPIsProtectedAssetPath(TargetPath))
 	{
-		return MCPError(FString::Printf(TEXT("Protected output path is not allowed: %s"), *TargetPath));
+		return MCPError(FString::Printf(TEXT("Protected output path is not allowed: %s. This cannot be overridden; write the output under /Game or a plugin content folder."), *TargetPath));
 	}
 	if (TargetPath.IsEmpty()) { Inputs.bUseSourcePath = true; }
 	else { Inputs.TargetPath = TargetPath; }
@@ -3196,7 +3164,7 @@ TSharedPtr<FJsonValue> FAnimationHandlers::BatchRetargetAnimations(const TShared
 		}
 		if (TargetPath.IsEmpty() && MCPIsProtectedAssetPath(P))
 		{
-			return MCPError(FString::Printf(TEXT("Cannot create a retargeted asset beside protected source path: %s"), *P));
+			return MCPError(FString::Printf(TEXT("Cannot create a retargeted asset beside protected source path: %s. This cannot be overridden; pass an output folder under /Game or a plugin content folder."), *P));
 		}
 		UAnimSequence* Anim = LoadAssetByPath<UAnimSequence>(P);
 		if (!Anim)

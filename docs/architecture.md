@@ -62,27 +62,32 @@ Every route is on `127.0.0.1` and needs `Authorization: Bearer <token>`. The ser
 | `GET /v1/health` | Version, `apiVersion`, editors, clients, calls in flight, extensions, UI bundle, `features` |
 | `GET /v1/events` | Server-sent events, resumable by `Last-Event-ID` |
 | `WS /v1/mcp` | One MCP session per socket |
+| `GET /v1/sessions`, `GET`/`PUT /v1/sessions/<id>/access` | Open MCP sessions and each one's access mode (`read-write` or `read-only`) |
 | `GET /v1/install`, `GET /v1/update`, `POST /v1/update/apply` | Install state and updates |
 | `POST /v1/editor/{start,stop,restart,rebuild}` | Editor operations, announced on the event stream |
-| `/v1/checkpoints` | Checkpoints per editor session (`checkpoint-routes.ts`, see [Checkpoints](checkpoints.md)) |
-| `/v1/plugins` | List, browse, install, update and uninstall ue-mcp plugins (`plugin-routes.ts`) |
+| `/v1/checkpoints` | Checkpoints per editor session (see [Checkpoints](checkpoints.md)) |
+| `/v1/journal` | The mutation journal per editor session: its groups, and reverting them |
+| `/v1/tools`, `/v1/leases` | Turn categories and Unreal toolsets on and off, and list asset leases |
+| `GET /v1/dialogs/native`, `POST /v1/dialogs/native/press` | Native Win32 dialogs an editor of the project shows, and pressing one |
+| `/v1/plugins` | List, browse, install, update and uninstall ue-mcp plugins |
 | `/v1/flows` | List flows, `GET /v1/flows/<name>/plan`, `POST /v1/flows/<name>/run`, `GET /v1/flows/events` |
 | `GET /v1/skills`, `GET /v1/actions`, `GET /v1/context/projection` | Skills, action effects, and what a context strategy advertises |
 | `/v1/ext/<name>/` | Routes an extension registers |
 | `GET /ui/` | The installed UI bundle |
+| `GET /ui/ext/<name>/` | A loaded extension's own UI bundle, listed in `/v1/health` under `uiBundles` |
 | `POST /v1/shutdown`, `POST /v1/handoff` | Exit now, or once no call is in flight |
 
-`DAEMON_API_VERSION` versions the HTTP API, the events and the shim protocol. `/v1/health` lists additions under `features`. [Configuration: the daemon](configuration.md#the-daemon) covers the CLI and what a client can read.
+The full table, with each route's method, path, query or body and the feature it came with, is `DAEMON_ROUTES` in `src/contract/daemon.ts`. The daemon's router (`src/daemon/router.ts`) walks it in order, and every route has one handler of one shape. `DAEMON_API_VERSION` versions the HTTP API, the events (`DAEMON_EVENT_TYPES`) and the shim protocol. `/v1/health` lists additions under `features`. [Configuration: the daemon](configuration.md#the-daemon) covers the CLI and what a client can read.
 
 ### Extensions and UI bundles
 
-An extension (`src/daemon/extensions.ts`) is a package with `activate(api)` and a `ueMcpExtension` field naming the extension API range it supports. The daemon loads extensions at startup from `~/.ue-mcp/extensions/` (`UE_MCP_EXTENSIONS_DIR`). An extension can register routes under `/v1/ext/<name>/`, publish and read events, run actions in process with `callAction`, register a model provider, use checkpoints, keep a data directory, and trust a key for UI bundles. `EXTENSION_API_VERSION` versions this contract; the daemon serves every version from `EXTENSION_API_MIN_VERSION` up.
+An extension (`src/daemon/extensions.ts`) is a package with `activate(api)` and a `ueMcpExtension` field naming the extension API range it supports. The daemon loads extensions at startup from `~/.ue-mcp/extensions/` (`UE_MCP_EXTENSIONS_DIR`). An extension can register routes under `/v1/ext/<name>/`, publish and read events, run actions in process with `callAction`, register a model provider, use checkpoints, keep a data directory, trust a key for UI bundles, and provide or use objects shared with other extensions through `services` (one provider per id, revoked when the provider is disposed). Anything beyond that is a permission the extension declares in `ueMcpExtension.permissions`: `registry.account` lets `registryAccount()` hand it the signed-in ue-mcp account and its token, and an extension that does not declare it gets null. `EXTENSION_API_VERSION` versions this contract; the daemon serves every version from `EXTENSION_API_MIN_VERSION` up.
 
-Versions install side by side as `<name>@<version>/`, and each project records the version it loads (`extension-versions.ts`), so updating an extension for one project does not change another. `ue-mcp extension install|use|list|remove` manages them.
+Versions install side by side as `<name>@<version>/`, and each project records the version it loads (`extension-versions.ts`), so updating an extension for one project does not change another. `ue-mcp extension install|use|list|remove` manages them. `ue-mcp install <name>` is the same install with the name resolved through `install-names.ts`, a list of names and release manifests. A manifest that declares an editor plugin channel also gets the project set up through init's `plan()` and `apply()`, and the channel's build for the project's engine installed under `Plugins/` (`editor/editor-plugin.ts`).
 
-A UI bundle (`src/daemon/ui-bundles.ts`) lives under `~/.ue-mcp/ui/`. It is served at `/ui/` only when its `manifest.sig` Ed25519 signature verifies against a key an extension trusted and every file matches its SHA-256 in `manifest.json`. A bundle named for a loaded extension is served only at that extension's version or older.
+A UI bundle (`src/daemon/ui-bundles.ts`) lives under `~/.ue-mcp/ui/`. It is served at `/ui/` only when its `manifest.sig` Ed25519 signature verifies against a key an extension trusted and every file matches its SHA-256 in `manifest.json`. A bundle named for a loaded extension is served only at that extension's version or older. A bundle named for a loaded extension verifies only against keys that extension trusted. Each loaded extension's own bundle is also served at `/ui/ext/<name>/`, within its own version window, and `ueMcpExtension.ui.root: false` keeps it off `/ui/`. A manifest's optional `module` (`entry`, `host`) is signed with it and names a file another page loads.
 
-The `ue-mcp/daemon` package export (`src/daemon-api.ts`) carries the types and helpers for building on the daemon: discovery, the extension contract, events, and bundle signing.
+The `ue-mcp/daemon` package export (`src/daemon-api.ts`) carries the types and helpers for building on the daemon: discovery, the extension contract, events, and bundle signing. Its types are declared in `src/contract/daemon.ts`, which imports nothing, so an internal refactor cannot change them by accident; `tests/golden/daemon-api.d.ts.txt` records the declarations, and a change to them fails the unit tests until it is re-recorded (`npm run golden:record`) and reviewed as additive or a version bump.
 
 ### Where Studio attaches
 
@@ -92,7 +97,7 @@ The `ue-mcp/daemon` package export (`src/daemon-api.ts`) carries the types and h
 
 **Entry point:** `src/index.ts`. A first argument naming a command runs the CLI (`src/cli/`); otherwise it starts the shim or the in-process server.
 
-The server registers the <!-- count:tools -->30<!-- /count --> category tools and the `flow` tool, each dispatched through the runtime's sessions.
+The server registers the <!-- count:tools -->31<!-- /count --> category tools and the `flow` tool, each dispatched through the runtime's sessions.
 
 ### Key modules
 
@@ -100,6 +105,7 @@ The server registers the <!-- count:tools -->30<!-- /count --> category tools an
 |--------|---------|
 | `index.ts` | Entry: CLI routing, server mode, shim or in-process server |
 | `daemon/` | Daemon, stdio shim, discovery, extensions, UI bundles, HTTP routes |
+| `contract/daemon.ts` | The daemon contract: API versions, features, routes, events, header names and public types |
 | `daemon-api.ts` | The public `ue-mcp/daemon` export |
 | `server/runtime.ts` | Sessions, bridges, flow tool and dispatch, shared by every client |
 | `server/mcp-server.ts` | One `McpServer` over a runtime: instructions, tools, flow |
@@ -110,11 +116,11 @@ The server registers the <!-- count:tools -->30<!-- /count --> category tools an
 | `dispatch/` | Per-call routing, editor gate, locks, offline and Python gates |
 | `config/project.ts` | `ProjectContext`: paths, `.uproject`, plugin mounts, `ue-mcp.yml` |
 | `codeintel/` | INI reading, C++ parsing, engine symbol index, Content index |
-| `core/types.ts` | `ToolDef`, `ActionSpec` and other shared types |
+| `surface/tool-types.ts` | `ToolDef`, `ActionSpec`, `ToolContext`: the category tool contract |
 | `core/errors.ts` | `McpError` and the `ErrorCode` enum |
 | `surface/category-tool.ts` | `categoryTool()`, `bp()`, routing parameter schemas |
 | `surface/target-params.ts` | The per-call `editor` / `toEditor` parameters |
-| `surface/schemas.ts` | Zod schemas for `.uproject`, `.uplugin` and `ue-mcp.yml` |
+| `config/schemas.ts` | Zod schemas for `.uproject`, `.uplugin` and `ue-mcp.yml` |
 | `surface/action-signature.ts` | One-line action signatures and their legend |
 | `surface/context/instructions.ts` | Server instructions, one variant per context strategy |
 | `surface/context/lean-context.ts` | Strategy choice, the lean `catalog`, paged `describe`, signature `search` |
@@ -150,7 +156,7 @@ Two kinds of action:
 
 ### Advertised surface and context strategy
 
-The [context strategy](configuration.md#context-strategy-full-lean-micro) decides what a client is handed at startup. `micro`, the default, advertises one `tools` gateway (<!-- tax:micro -->~2.2k<!-- /tax --> tokens with the instructions). `lean` advertises the category tools with a summary each (<!-- tax:lean -->~20k<!-- /tax -->). `full` adds one signature line per action (<!-- tax:full -->~55k<!-- /tax -->). `scripts/context-tax.mjs` measures these and a release gate holds each to its budget.
+The [context strategy](configuration.md#context-strategy-full-lean-micro) decides what a client is handed at startup. `micro`, the default, advertises one `tools` gateway (<!-- tax:micro -->~240<!-- /tax --> tokens with the instructions). `lean` advertises the category tools with a summary each (<!-- tax:lean -->~32k<!-- /tax -->). `full` adds one signature line per action (<!-- tax:full -->~90k<!-- /tax -->). `scripts/context-tax.mjs` measures these and a release gate holds each to its budget.
 
 A category tool is advertised as `action` (the enum of its actions) plus `args` (an object). The server unwraps `args` and validates it against the category's zod shape, so a refusal names the bad parameter. The micro gateway's `call` is checked against the target category the same way.
 
@@ -186,6 +192,8 @@ A close frame gets its status code echoed back and a ping gets a pong with the s
 
 The upgrade request is read to its blank line under one deadline and one size bound, and validated before a `101` is sent: `GET`, HTTP/1.1, `Upgrade: websocket`, `Connection: Upgrade`, `Sec-WebSocket-Version: 13`, and a `Sec-WebSocket-Key` that decodes to 16 bytes. A refusal answers with an HTTP status and a sentence. Bytes pipelined behind the request go straight to the frame reader.
 
+**Session token.** The bridge listens on 127.0.0.1 only and refuses any upgrade that carries an `Origin` header, which keeps out other machines and web pages. To keep out other local processes and other accounts on the same machine, it also requires a token. When its port is bound it writes 32 random bytes from the OS (BCryptGenRandom on Windows, `/dev/urandom` elsewhere), as 64 hex digits, to `~/.ue-mcp/bridge/<port>.token`, and every upgrade must carry `Authorization: Bearer <token>`. On Linux and macOS the directory is `0700` and the file `0600`; on Windows both get an access list that grants the editor's user alone. The comparison is constant time, a refusal is a `401` with a sentence saying what to do, and the file is removed on a clean shutdown. `UE_MCP_BRIDGE_TOKEN_DIR` moves the directory for the plugin and the client alike. The client sends the token when the file for its port exists and connects without one when it does not, so it still works with a plugin that predates the token. The `101` and the `401` carry `X-UE-MCP-Bridge-Auth: token-file`, and `get_bridge_capabilities` lists the `session-token` feature.
+
 #### Capability handshake
 
 On connect the client calls `get_bridge_capabilities`, which the bridge answers on the socket thread without touching the game thread:
@@ -220,13 +228,15 @@ The contract travels one way:
 
 1. **The registry** validates the spec at registration. It refuses the routing names (`action`, `timeoutMs`, `select`, `omit`, `editor`, `toEditor`), a name declared twice, an item type on anything but an array, a value shape that does not fit its type, and a choice naming an undeclared or required parameter. A refused spec is logged and dropped; the handler still registers. At dispatch it renames each alias to its parameter's name, so the handler reads declared names only.
 2. **The bridge** publishes every spec in `get_bridge_capabilities.handlerSpecs`.
-3. **`npm run specs:record`** writes that answer from a `tests/ue_mcp` editor to `tests/golden/handler-specs.json`.
+3. **`npm run specs:record`** writes that answer from a `tests/ue_mcp` editor to `tests/golden/handler-specs.json`, with a fingerprint of the C++ spec source beside it in `handler-specs.source.json`.
 4. **`npm run specs:generate`** renders the recording into `src/tools/specs/<category>.generated.ts`: one zod entry per name and alias, and each method's `Params:` clause.
+
+`npm run generate -- --editor` runs both, then every generator downstream of them.
 5. **The category** declares the action with `specBp(effect, summary, method)`. Only the summary and effect are hand-written. A rename is an alias in the spec. `prepareCall` refuses a call that does not satisfy the spec's choices before anything is sent, on the MCP and flow routes alike.
 
 The advertised surface always comes from the recording, so the startup contract does not depend on which plugin answered. With an editor connected, `project(get_status)` reports any difference from the recording under `deployedPlugin.handlerSpecDrift`.
 
-Four tests hold the chain: `tests/unit/handler-specs.test.ts` (the generated modules match the recording, and every bridge action takes its parameters from a spec), `tests/live/handler-specs.test.ts` (the running plugin publishes what was recorded), the C++ test `UE.MCP.Bridge.HandlerSpec.Contract` (each spec'd handler, called with every declared parameter, reads exactly those), and `tests/unit/handler-spec-exempt.test.ts` (a contract-exempt handler's source reads exactly what its spec declares).
+Five tests hold the chain: `tests/unit/handler-spec-source.test.ts` (the recording was made from the spec source as it stands, so CI sees a spec edit nobody re-recorded), `tests/unit/handler-specs.test.ts` (the generated modules match the recording, and every bridge action takes its parameters from a spec), `tests/live/handler-specs.test.ts` (the running plugin publishes what was recorded), the C++ test `UE.MCP.Bridge.HandlerSpec.Contract` (each spec'd handler, called with every declared parameter, reads exactly those), and `tests/unit/handler-spec-exempt.test.ts` (a contract-exempt handler's source reads exactly what its spec declares).
 
 ##### What a spec can say
 
@@ -279,7 +289,7 @@ The plugin runs a raw WebSocket server on a dedicated thread, dispatches each re
 | `HandlerPackageSave.h` | `SaveAssetPackage`, `SaveAssetPackageChecked`, `MCPPackageWriteBlocked`, `MCPNoteSaveOutcome` |
 | `HandlerJsonConvert.h` | Vector, rotator, colour, quaternion, transform and string-list JSON builders |
 | `HandlerObjectUtils.h` | Property export, file dumps, `FGCRootScope`, subobject walks, component and collision lookup |
-| `HandlerEngineVersion.h` | The `UE_MCP_HAS_5_x_API` gates and engine API shims |
+| `HandlerEngineVersion.h` | Every engine-version gate (`UE_MCP_HAS_5_x_API`) and feature macro, and the engine API shims |
 | `HandlerAssetCreate.h` | `MCPCreateAssetIdempotent<T>` |
 
 ### Handler groups
@@ -317,13 +327,14 @@ The plugin runs a raw WebSocket server on a dedicated thread, dispatches each re
 | ProjectHandlers | Project info, world subsystem queries |
 | StateTreeHandlers | StateTree authoring |
 | ChooserHandlers | Chooser tables |
-| EpicHandlers | The UE 5.8 Toolset Registry |
+| EpicHandlers | The Toolset Registry (UE 5.8+) |
 | MassHandlers | Mass Entity fragments, traits and processors |
 | SkeletalMeshHandlers | Skeletal mesh LODs, sections, instancing settings |
 | FabHandlers | Fab library import |
 | DatasmithHandlers | Datasmith scene import and query |
 | MetaHumanHandlers | MetaHuman characters |
 | LockHandlers | Per-asset locks for concurrent agents |
+| BatchHandlers | `execute_batch`: several handlers run back to back as one game-thread job in one editor transaction |
 | DiffHandlers | Semantic Blueprint and asset diffing |
 | CheckpointHandlers | Checkpoint arming and restore |
 | SourceControlHandlers | Source control through the editor's provider |
@@ -335,7 +346,7 @@ The plugin runs a raw WebSocket server on a dedicated thread, dispatches each re
 
 ## What works without the editor
 
-Every tool is advertised whether or not an editor is attached. Bridge actions need a running editor; local actions run in Node.js. `src/dispatch/offline.ts` lists which local actions work with the editor down.
+Every tool is advertised whether or not an editor is attached. Bridge actions need a running editor; local actions run in Node.js. `src/flow/offline.ts` lists which local actions work with the editor down.
 
 | Works without an editor | Needs the editor |
 |-------------------------|------------------|

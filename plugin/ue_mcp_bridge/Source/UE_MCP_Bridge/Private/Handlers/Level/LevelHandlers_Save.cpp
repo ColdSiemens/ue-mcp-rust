@@ -265,7 +265,7 @@ TSharedPtr<FJsonValue> FLevelHandlers::SaveLevel(const TSharedPtr<FJsonObject>& 
 	// an agent redoing work it never lost.
 	if (GEditor && (GEditor->PlayWorld != nullptr || GEditor->bIsSimulatingInEditor))
 	{
-		return MCPError(TEXT("Play In Editor is running; stop it before saving the level. Saving during PIE is what produced an unexplained failure before."));
+		return MCPError(TEXT("Play In Editor is running; stop it before saving the level. Saving during PIE is what produced an unexplained failure before. ") + MCPStopPlayInEditorStep());
 	}
 
 	// Landscape edits land in edit layers and reach the saved heightmaps and weightmaps through a merge that runs on
@@ -273,11 +273,12 @@ TSharedPtr<FJsonValue> FLevelHandlers::SaveLevel(const TSharedPtr<FJsonObject>& 
 	int32 LandscapesMerged = 0;
 	for (TActorIterator<ALandscape> It(World); It; ++It)
 	{
-		if (It->HasLayersContent())
-		{
-			It->ForceUpdateLayersContent();
-			++LandscapesMerged;
-		}
+		// From 5.7 every landscape uses edit layers and HasLayersContent is deprecated.
+#if !UE_MCP_HAS_5_7_API
+		if (!It->HasLayersContent()) continue;
+#endif
+		It->ForceUpdateLayersContent();
+		++LandscapesMerged;
 	}
 
 	// commitDeletes: the editor's own save path, which removes the external

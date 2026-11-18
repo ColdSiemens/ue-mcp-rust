@@ -167,6 +167,8 @@ namespace
 		if (!Run.RecordingId.IsEmpty()) R->SetStringField(TEXT("recording_id"), Run.RecordingId);
 		if (Run.bReplay) R->SetStringField(TEXT("replay_of"), Run.ReplayOf);
 		R->SetNumberField(TEXT("elapsed_ms"), Run.NowMs);
+		if (!Run.WaitingFor.IsEmpty()) R->SetStringField(TEXT("waiting_for"), Run.WaitingFor);
+		if (!Run.StopReason.IsEmpty()) R->SetStringField(TEXT("stop_reason"), Run.StopReason);
 
 		TArray<TSharedPtr<FJsonValue>> Steps;
 		for (int32 I = 0; I < Run.Steps.Num(); ++I)
@@ -279,9 +281,9 @@ void FPIEHandlers::RegisterScriptHandlers(FMCPHandlerRegistry& Registry)
 	const TCHAR* const PieInstanceDoc = TEXT("FWorldContext PIEInstance to observe (default the active PIE world)");
 	const TCHAR* const ClientIdDoc = TEXT("Local-player index inside the selected PIE world (default 0)");
 
-	// One step: {instruction, judge auto|manual, agent_judgeable, resolve_in_pie, arrange, act, expect {value, op, target, within_ms}}.
+	// One step: {instruction, judge auto|manual, agent_judgeable, resolve_in_pie, arrange, act, expect {value, op, target, within_ms, client}}.
 	// The shape is validated in the handler, so the replay actions' inline steps and these share one key type.
-	const TCHAR* const StepsShape = TEXT("{instruction, judge: auto|manual (default auto), agent_judgeable (manual steps: false means only a person gives the verdict, default true), resolve_in_pie (true: expect.value and the actors arrange and act name only resolve once PIE runs, so script_create and script_update do not check them), arrange: [{kind: spawn, class, at?, rotation?, scale?} | {kind: set, target, path, value} | {kind: call, target, func, args?}] (run when the step starts), act: [{client?, place: {at, offset?, face?} | {location, yaw?}} | {client?, press: {action, frames?}} | {client?, inject: {action, value}} | {client?, hold: {action, value, ms}} | {client?, tape: {action, values}} | {client?, console} | {client?, capture} | {wait_ms}] (run after arrange, as uat_run runs a step's do; within_ms counts from its end), expect: {value (tracked value path or last segment, actor id for exists, widget for visible), op: decreasing|increasing|eq|gt|lt|visible|exists, target (number for eq/gt/lt, boolean for visible/exists, default true), within_ms}}");
+	const TCHAR* const StepsShape = TEXT("{instruction, judge: auto|manual (default auto), agent_judgeable (manual steps: false means only a person gives the verdict, default true), resolve_in_pie (true: expect.value and the actors arrange and act name only resolve once PIE runs, so script_create and script_update do not check them), arrange: [{kind: spawn, class, at?, rotation?, scale?} | {kind: set, target, path, value} | {kind: call, target, func, args?}] (run when the step starts), act: [{client?, place: {at, offset?, face?} | {location, yaw?}} | {client?, press: {action, frames?}} | {client?, inject: {action, value}} | {client?, hold: {action, value, ms}} | {client?, tape: {action, values, hz?}} | {client?, console} | {client?, capture} | {wait_ms}] (run after arrange, as uat_run runs a step's do; within_ms counts from its end), expect: {value (tracked value path or last segment, actor id for exists, widget for visible, Input Action asset path for triggered), op: decreasing|increasing|eq|gt|lt|visible|exists|triggered, target (number for eq/gt/lt, boolean for visible/exists, default true, optional least change for decreasing/increasing; none for triggered), within_ms (triggered: 0 or absent waits with no timeout), client (triggered only: the player whose input is watched, 0 the editor's own player (default), 1..N a remote player, as act counts them)}}. triggered passes on the first fresh trigger of the action after act ends (input still held when the window opens does not count) and records triggered_at_ms and action_value as evidence");
 	const TCHAR* const MapDoc = TEXT("Level the script plays in, as a package or object path such as /Game/Maps/L_Arena. A run opens it before PIE and refuses when the open level has unsaved changes; empty plays whatever level is open");
 	const TCHAR* const ManualOnlyDoc = TEXT("Every step is judged by a verdict: allows a script with no auto step that has an expect (default false)");
 
@@ -294,7 +296,7 @@ void FPIEHandlers::RegisterScriptHandlers(FMCPHandlerRegistry& Registry)
 		MCPParam::Optional(TEXT("map"), EType::String, MapDoc),
 		MCPParam::Optional(TEXT("default_within_ms"), EType::Integer, TEXT("Default auto-step window in game ms (default 5000)")).Min(1),
 		MCPParam::Optional(TEXT("manual_only"), EType::Boolean, ManualOnlyDoc),
-		MCPParam::Optional(TEXT("onConflict"), EType::String, TEXT("When the asset exists: skip (default), update or replace (overwrite it), error")).Enum({
+		MCPSharedParam::OnConflict().Describe(TEXT("When the asset exists: skip (default), update or replace (overwrite it), error")).Enum({
 			TEXT("skip"), TEXT("update"), TEXT("replace"), TEXT("error") }),
 	}, MCPSpec::ContractExempt(TEXT("Creates and saves a script asset")));
 	Registry.RegisterHandler(TEXT("pie_script_read"), &PieScriptRead, {
@@ -604,7 +606,7 @@ TSharedPtr<FJsonValue> FPIEHandlers::PieScriptDelete(const TSharedPtr<FJsonObjec
 	const bool bConfirm = OptionalBool(Params, TEXT("confirm"), false);
 	if (PathErr) return PathErr;
 	if (!bConfirm) return MCPError(TEXT("confirm=true required to delete a test script"));
-	if (MCPIsProtectedAssetPath(Path)) return MCPError(FString::Printf(TEXT("Refusing to delete a protected path: %s"), *Path));
+	if (MCPIsProtectedAssetPath(Path)) return MCPError(FString::Printf(TEXT("Refusing to delete a protected path: %s. This cannot be overridden."), *Path));
 
 	if (!UEditorAssetLibrary::DoesAssetExist(Path))
 	{
@@ -1009,7 +1011,12 @@ TSharedPtr<FJsonValue> FPIEHandlers::PieScriptResults(const TSharedPtr<FJsonObje
 			Live->SetBoolField(TEXT("live"), true);
 			return MCPResult(Live);
 		}
-		ResultsPath = DefaultScriptObservationsRoot() / Id / TEXT("results.json");
+		const FString Root = DefaultScriptObservationsRoot();
+		if (auto Err = MCPRequirePathInside(Root / Id / TEXT("results.json"), { Root }, ResultsPath)) return Err;
+	}
+	else if (auto Err = MCPRequireWritablePath(ResultsPath, ResultsPath))
+	{
+		return Err;
 	}
 
 	TSharedPtr<FJsonObject> Obj = LoadJsonFile(ResultsPath);
@@ -1060,12 +1067,23 @@ TSharedPtr<FJsonValue> FPIEHandlers::PieScriptReplay(const TSharedPtr<FJsonObjec
 	const bool bAutoStop = OptionalBool(Params, TEXT("auto_stop_pie"), true);
 	const int32 ClientId = OptionalInt(Params, TEXT("client_id"), 0);
 	if (!bPIEInstanceOk) return MCPError(PIEInstanceError);
+	FString CheckedResultsPath;
+	if (!ResultsPath.IsEmpty())
+	{
+		if (auto Err = MCPRequireWritablePath(ResultsPath, CheckedResultsPath)) return Err;
+	}
+	else if (!RunId.IsEmpty())
+	{
+		FString Unused;
+		const FString Root = DefaultScriptObservationsRoot();
+		if (auto Err = MCPRequirePathInside(Root / RunId, { Root }, Unused)) return Err;
+	}
 	if (!(TimeScale > 0.0)) return MCPError(TEXT("time_scale must be greater than 0"));
 	if (ClientId < 0) return MCPError(TEXT("client_id must be 0 or more"));
 
 	FScriptReplayConfig Cfg;
 	Cfg.SourceRunId = RunId;
-	Cfg.ResultsPath = ResultsPath;
+	Cfg.ResultsPath = CheckedResultsPath;
 	Cfg.TimeScale = static_cast<float>(TimeScale);
 	Cfg.bAutoStopPIE = bAutoStop;
 	Cfg.ClientId = ClientId;

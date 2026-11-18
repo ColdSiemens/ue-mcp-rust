@@ -174,13 +174,12 @@ namespace
 			return false;
 		}
 
-#if WITH_EDITORONLY_DATA
 		using namespace Metasound::Frontend;
 #if UE_MCP_HAS_5_5_API
 		IDocumentBuilderRegistry* Registry = IDocumentBuilderRegistry::Get();
 		if (!Registry)
 		{
-			OutError = MCPError(TEXT("The MetaSound document builder registry is not available, so an existing MetaSound cannot be opened for editing. Enable the MetaSound plugin."));
+			OutError = MCPError(TEXT("The MetaSound document builder registry is not available, so an existing MetaSound cannot be opened for editing. ") + MCPEnablePluginStep(TEXT("Metasound")));
 			return false;
 		}
 #else
@@ -189,7 +188,7 @@ namespace
 		UMetaSoundBuilderSubsystem* Subsystem = UMetaSoundBuilderSubsystem::Get();
 		if (!Subsystem)
 		{
-			OutError = MCPError(TEXT("The MetaSound builder subsystem is not available, so an existing MetaSound cannot be opened for editing. Enable the MetaSound plugin."));
+			OutError = MCPError(TEXT("The MetaSound builder subsystem is not available, so an existing MetaSound cannot be opened for editing. ") + MCPEnablePluginStep(TEXT("Metasound")));
 			return false;
 		}
 #endif
@@ -226,10 +225,6 @@ namespace
 #endif
 		Out.Source = Out.bBuilderWasAttached ? TEXT("builder") : TEXT("asset");
 		return true;
-#else
-		OutError = MCPError(TEXT("MetaSound graph editing requires an editor build."));
-		return false;
-#endif
 	}
 
 	/** Persist. Every edit ends here. */
@@ -381,24 +376,20 @@ namespace
 	/** A cue node by object name, which is what soundcue_add_node hands back. */
 	USoundNode* MSEditFindCueNode(USoundCue* Cue, const FString& NodeName)
 	{
-#if WITH_EDITORONLY_DATA
 		for (USoundNode* N : Cue->AllNodes)
 		{
 			if (N && N->GetName() == NodeName) return N;
 		}
-#endif
 		return nullptr;
 	}
 
 	FString MSEditCueNodeIds(USoundCue* Cue)
 	{
 		TArray<FString> Ids;
-#if WITH_EDITORONLY_DATA
 		for (USoundNode* N : Cue->AllNodes)
 		{
 			if (N) Ids.Add(FString::Printf(TEXT("%s (%s)"), *N->GetName(), *N->GetClass()->GetName()));
 		}
-#endif
 		return Ids.Num() > 0 ? FString::Join(Ids, TEXT(", ")) : FString(TEXT("(none)"));
 	}
 
@@ -406,10 +397,8 @@ namespace
 	 *  the package was written, with the reason in OutSaveError when not. */
 	bool MSEditSaveCue(USoundCue* Cue, FString& OutSaveError)
 	{
-#if WITH_EDITOR
 		Cue->LinkGraphNodesFromSoundNodes();
 		Cue->PostEditChange();
-#endif
 		return SaveAssetPackageChecked(Cue, OutSaveError);
 	}
 }
@@ -1080,7 +1069,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SoundCueRemoveNode(const TSharedPtr<FJson
 	// Detach from every parent before removing, or the tree keeps a null child
 	// slot that the cue evaluates as silence.
 	TArray<TSharedPtr<FJsonValue>> DetachedFrom;
-#if WITH_EDITORONLY_DATA
 	for (USoundNode* Candidate : Cue->AllNodes)
 	{
 		if (!Candidate || Candidate == Node) continue;
@@ -1094,7 +1082,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SoundCueRemoveNode(const TSharedPtr<FJson
 			MCPAudio::DetachCueSlot(Candidate, i);
 		}
 	}
-#endif
 
 	// Orphan the node's own children rather than deleting them: they are
 	// separate nodes the caller may still want, and a cascade nobody asked for
@@ -1111,7 +1098,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SoundCueRemoveNode(const TSharedPtr<FJson
 		Cue->FirstNode = nullptr;
 	}
 
-#if WITH_EDITORONLY_DATA
 	Cue->AllNodes.Remove(Node);
 	// The paired editor graph node has to go with it, or the cue graph shows a
 	// node the audio tree no longer has.
@@ -1122,7 +1108,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SoundCueRemoveNode(const TSharedPtr<FJson
 			Graph->RemoveNode(GraphNode);
 		}
 	}
-#endif
 
 	FString SaveError;
 	const bool bSaved = MSEditSaveCue(Cue, SaveError);
@@ -1210,7 +1195,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SoundCueDisconnect(const TSharedPtr<FJson
 
 	if (Child)
 	{
-#if WITH_EDITORONLY_DATA
 		for (USoundNode* Candidate : Cue->AllNodes)
 		{
 			if (!Candidate || Candidate == Child) continue;
@@ -1225,7 +1209,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SoundCueDisconnect(const TSharedPtr<FJson
 				MCPAudio::DetachCueSlot(Candidate, i);
 			}
 		}
-#endif
 	}
 
 	if (Detached.Num() == 0 && !bClearedRoot)
@@ -1312,7 +1295,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SetSoundClassParent(const TSharedPtr<FJso
 		}
 	}
 
-#if WITH_EDITOR
 	// A cycle would make the mixer's volume walk never terminate. RecurseCheckChild
 	// answers whether the proposed parent is already below this class.
 	if (NewParent && SoundClass->RecurseCheckChild(NewParent))
@@ -1321,7 +1303,6 @@ TSharedPtr<FJsonValue> FAudioHandlers::SetSoundClassParent(const TSharedPtr<FJso
 			TEXT("'%s' is already a descendant of '%s', so parenting one to the other would make a cycle."),
 			*NewParent->GetName(), *SoundClass->GetName()));
 	}
-#endif
 
 	USoundClass* OldParent = SoundClass->ParentClass;
 	const FString OldParentPath = OldParent ? OldParent->GetPathName() : FString();

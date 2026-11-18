@@ -1,3 +1,4 @@
+// @session independent: One process-wide bus for script run events. The run id rides on the event.
 /**
  * Live progress of a PIE test script run, one module-level bus for every run in this process.
  *
@@ -23,9 +24,12 @@ export type ScriptVerdictSource = "auto" | "action" | "elicitation" | "agent" | 
 
 export interface ScriptExpect {
   value: string;
-  op: "decreasing" | "increasing" | "eq" | "gt" | "lt" | "visible" | "exists";
+  op: "decreasing" | "increasing" | "eq" | "gt" | "lt" | "visible" | "exists" | "triggered";
   target?: number | boolean;
+  /** triggered: 0 or absent waits with no timeout. */
   within_ms?: number;
+  /** triggered only: the player whose input is watched, 0 the editor's own player, 1..N a remote player. */
+  client?: number;
 }
 
 export interface ScriptStep {

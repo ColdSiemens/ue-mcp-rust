@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 20 or newer
-- Unreal Engine 5.4 to 5.8, for building the plugin and live testing
+- Unreal Engine <!-- count:engineRange -->5.4 to 5.9<!-- /count -->, for building the plugin and live testing
 
 ## Setup
 
@@ -13,6 +13,8 @@ cd ue-mcp
 npm install
 ```
 
+The checked-in `.claude/settings.json` holds the shared Claude Code settings: attribution, a deny list and a few read-only allows. It does not bypass permissions. Keep personal permissions in `.claude/settings.local.json`, which git ignores.
+
 ## Resolving an issue with Claude Code
 
 From inside a `ue-mcp` clone:
@@ -21,7 +23,7 @@ From inside a `ue-mcp` clone:
 npx ue-mcp resolve 16
 ```
 
-This fetches issue #16 from the repository the `origin` remote names, creates a `resolve/16` branch from `origin/main`, and runs `claude --print --dangerously-skip-permissions` with the issue and the repo conventions. Claude implements the fix, runs `npx tsc --noEmit` and commits. The command then pushes the branch and opens a pull request. It needs the `gh` and `claude` CLIs and push access to `origin`, and works on the current checkout.
+This fetches issue #16 from the repository the `origin` remote names, creates a `resolve/16` branch from `origin/main`, and runs `claude --print` with the issue and the repo conventions. Claude runs in `dontAsk` permission mode with a fixed tool list: reading and editing files, `npx tsc --noEmit`, and `git status`, `diff`, `add` and `commit`. Anything else is denied. The issue text goes into the prompt as untrusted data. Claude implements the fix, runs `npx tsc --noEmit` and commits. The command then pushes the branch and opens a pull request. It needs the `gh` and `claude` CLIs and push access to `origin`, and works on the current checkout.
 
 ## Building
 
@@ -34,7 +36,7 @@ npm run up:build         # stop the test editor, build, relaunch
 
 `npm run build` builds only the `ue_mcpEditor` target of `tests/ue_mcp/ue_mcp.uproject` and refuses any other project. The test editor holds the module DLLs, so close it first or use `npm run up:build`. Neither command runs the deployer: run `node scripts/deploy.mjs` after editing `plugin/`.
 
-The build passes `-NoEngineChanges`, so Unreal aborts and prints the offending files if the build would overwrite anything already in the engine tree. Engine selection order is `UE_MCP_TEST_ENGINE_ROOT`, then `UE_BUILD_TOOL_PATH`, then the default install locations. A pinned root with no build tool is an error.
+The build passes `-NoEngineChanges`, so Unreal aborts and prints the offending files if the build would overwrite anything already in the engine tree. Engine selection order is `UE_MCP_TEST_ENGINE_ROOT`, then `UE_ROOT`, then `UE_BUILD_TOOL_PATH`, then the default install locations. `UE_ROOT` is the engine root some build hosts set for a pinned Unreal engine, so a build there needs no ue-mcp-specific variable. A pinned root with no build tool is an error.
 
 ```powershell
 # Roots the build and run scripts must never touch, whatever else is set.
@@ -68,6 +70,7 @@ src/
 ├── init.ts, update.ts, deploy-cli.ts  # Other package bins, thin wrappers over cli/
 ├── task.ts, guard-task.ts, daemon-api.ts  # `ue-mcp/task`, `ue-mcp/guard`, `ue-mcp/daemon` exports
 ├── tools.ts              # ALL_TOOLS registry
+├── contract/             # The daemon contract: API versions, features, routes, events, public types
 ├── daemon/               # Daemon, stdio shim, discovery, extensions, UI bundles, HTTP routes
 ├── server/               # Runtime shared by clients, McpServer per client, context projection
 ├── core/                 # Errors, logging, env, shared types, package root, version check
@@ -77,19 +80,21 @@ src/
 ├── sessions/             # Registry of editors and each session's surface
 ├── surface/              # categoryTool, action specs, schemas, signatures, parameter routing
 │   └── context/          # micro/lean strategies, instructions, tool search
-├── dispatch/             # Per-call routing, editor gate, locks, offline and Python gates
+├── dispatch/             # Per-call routing, editor gate, locks
 ├── codeintel/            # Engine symbol index, C++ parsing, .ini reading, Content index
 ├── checkpoints/          # Checkpoint shadow repository and diffs
 ├── pie/                  # PIE test script watching and events
-├── feedback/             # Feedback routing and filing, GitHub auth, scrubbers
+├── feedback/             # Feedback routing and filing, scrubbers
+├── github/               # GitHub sign-in shared by feedback and the registry, repository URLs
 ├── extensions/           # ue-mcp plugin packages, registry, skills, scaffolding
-├── integrations/claude-code/  # Hooks and MCP client config
-├── cli/                  # CLI commands, --editor parsing, terminal UI (cli/ui/)
+├── integrations/         # MCP client configs (mcp-clients/), Epic's servers (epic/), agent hooks (claude-code/)
+├── terminal/             # Terminal rendering: colours, progress, selection
+├── cli/                  # CLI commands, --editor parsing
 ├── flow/                 # Flow engine (registry, loader, task factory, HTTP)
-└── tools/                # <!-- count:tools -->30<!-- /count --> category tools, one file each
+└── tools/                # <!-- count:tools -->31<!-- /count --> category tools, one file each
     ├── project/          # project category, split by action group
-    ├── epic/             # Generated epic_* actions (npm run epic:generate)
-    └── specs/            # Generated parameter specs (npm run specs:generate)
+    ├── epic/             # Generated epic_* actions (npm run generate)
+    └── specs/            # Generated parameter specs (npm run generate)
 
 plugin/ue_mcp_bridge/     # C++ bridge plugin
 └── Source/
@@ -121,8 +126,9 @@ docs/                      # Documentation
 | `npm run test:live` | `tests/live` through the shipped server, sharded across editors it launches | Launches its own |
 | `npm run test:smoke` | Every registered handler | Yes |
 | `npm run test:suites` | The Vitest suites in `tests/smoke` (`-- level` filters by file name) | Yes |
+| `npm run generate` | Every generated file (action modules, tool reference, stamped counts, golden, coverage) in order | No (`-- --editor` adds the recordings, Yes) |
 
-CI runs the unit and integration suites on every pull request.
+CI runs the unit and integration suites on every pull request, and fails when `npm run generate` would change a committed file.
 
 !!! warning "Editor tests target the test project only"
     Smoke, suite and automation runs execute real mutations (creating blueprints, deleting assets, modifying the level). They target `tests/ue_mcp/ue_mcp.uproject` only: after connecting, the runner asks the editor which project it has open and aborts before sending anything if it is not `tests/ue_mcp`. Non-loopback hosts are refused.
@@ -141,6 +147,8 @@ No environment variable is needed. When nothing answers, the failure names the l
 
 `npm run test:automation -- --filter <prefix>` narrows the C++ suite, for example `--filter UE.MCP.Level.PlaceVolume` (native volume placement) or `--filter UE.MCP.Blueprint.TransactionalNodes` (graph node flags). `--verbose` prints every error line.
 
+`--filter UE.MCP.Landscape.HeightRead` checks that `landscape(get_height_region)` returns the expected heights without dirtying a clean landscape package or clearing an existing dirty flag, for merged and edit-layer reads. The same reader serves the point, normal, slope, analysis, export and geo-projection height queries.
+
 ### Live tests
 
 Each shard of `npm run test:live` is a copy of `tests/ue_mcp` with its own editor and port, launched with the kind its files declare (`// @live-editor headless`, `render`, `interactive`, `base`, `scm`, `none`, `lifecycle`). Files are split by measured time, the shard count follows free memory, and the run fails over 10 minutes or when a test passes its budget. Every shard is checked to have its own project open before anything is sent.
@@ -151,6 +159,8 @@ Each shard of `npm run test:live` is a copy of `tests/ue_mcp` with its own edito
 - `tests/live/crash-class-inputs.test.ts` drives inputs that have crashed the editor and follows each call with a liveness probe.
 - `tests/live/matrix.ts` records where each case's assertion lives, and `tests/live/coverage.test.ts` checks each reference resolves.
 
+See [batch component properties](blueprint-component-properties-batch.md) for batch template edits and rollback limits.
+
 ## Adding an action or category
 
 ### TypeScript side
@@ -158,7 +168,7 @@ Each shard of `npm run test:live` is a copy of `tests/ue_mcp` with its own edito
 A category is a file in `src/tools/` built with `categoryTool(name, summary, actions, extraSchema?, options?)`, added to `ALL_TOOLS` in `src/tools.ts`:
 
 ```typescript
-import type { ToolDef } from "../core/types.js";
+import type { ToolDef } from "../surface/tool-types.js";
 import { categoryTool } from "../surface/category-tool.js";
 import { specBp, schema as specSchema } from "./specs/myfeature.generated.js";
 
@@ -187,7 +197,7 @@ A category handler that calls another action in its own category routes that cal
 1. Add the handler in `plugin/ue_mcp_bridge/Source/UE_MCP_Bridge/Private/Handlers/<Category>/`. It is static, takes `const TSharedPtr<FJsonObject>& Params` and returns `TSharedPtr<FJsonValue>`.
 2. Register it with a [parameter spec](architecture.md#parameter-specs) in the group's `RegisterHandlers`. A new group is added to `HandlerCatalog.cpp`.
 3. Follow [Handler Conventions](handler-conventions.md) for idempotency and rollback.
-4. Deploy, build, then `npm run specs:record` against `tests/ue_mcp` and `npm run specs:generate`.
+4. Deploy, build, open the editor on `tests/ue_mcp`, then `npm run generate -- --editor`. It records the specs and regenerates everything that depends on them; CI fails while a spec change is not re-recorded.
 
 Every new action needs a behavioural test (see the behavioural coverage gate in `CLAUDE.md`).
 
@@ -226,7 +236,7 @@ AssetHandlers_BulkUpsert.cpp(53,6): error C2084: function
 
 The grouping shifts with file count, file order and the adaptive-unity working set, which UBT derives from `git status`, so a duplicate can build on one machine and fail on the next.
 
-Put a helper two files need in a shared header (one of the `Public/Handler*.h` headers that `HandlerUtils.h` gathers), never a copy. Copies also drift apart.
+Put a helper two files need in a shared header (one of the `Handler*.h` headers that `HandlerUtils.h` gathers, under `Private/`), never a copy. Copies also drift apart.
 
 ```bash
 npm run audit:unity      # duplicate file-local definitions, per module
@@ -241,6 +251,27 @@ Build.bat ue_mcpEditor Win64 Development -Project="...\ue_mcp.uproject" -Disable
 ```
 
 `-DisableAdaptiveUnity` matters: adaptive unity moves locally modified files out of their blob, which hides a collision from the person who introduced it.
+
+### Engine-version gates
+
+`Public/HandlerEngineVersion.h` is the one owner of engine-version gating. A gate names a `UE_MCP_HAS_5_x_API` macro or a feature macro defined there:
+
+```cpp
+#if UE_MCP_HAS_5_8_API          // not ENGINE_MINOR_VERSION >= 8
+#if UE_MCP_HAS_PCG_NODE_INSPECTION
+```
+
+- Never read `ENGINE_MAJOR_VERSION`, `ENGINE_MINOR_VERSION` or `UE_VERSION_OLDER_THAN` outside the header.
+- Never `#define` a feature macro in a `.cpp`: it leaks into the files after it in the unity blob. Add it to the header.
+- The oldest supported engine needs no gate.
+- `UE_MCP_Bridge` and `UE_MCP_BridgeMVVM` only build for the editor, so they carry no `WITH_EDITOR` or `WITH_EDITORONLY_DATA` guards.
+- An action compiled out on an older engine stays registered and answers `MCPUnsupportedEngineError(subject, "5.x", fallback)`, naming what to do on that engine.
+
+```bash
+npm run audit:engine-gates   # gates written outside HandlerEngineVersion.h
+```
+
+The audit runs in `npm run audit`, in the pre-commit hook when plugin sources are staged, and as a unit test.
 
 ## Dependencies
 

@@ -1,9 +1,10 @@
+// @session per-session: One ProjectContext per session, with that project's config cascade.
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { deepMerge } from "@db-lyon/flowkit";
 import { McpError, ErrorCode } from "../core/errors.js";
 import { info, warn } from "../core/log.js";
-import { UProjectSchema, UeMcpConfigSchema } from "../surface/schemas.js";
+import { UProjectSchema, UeMcpConfigSchema } from "./schemas.js";
 import { resolveEngineRoot, type EngineLookup } from "../editor/engine-root.js";
 import {
   configLayerFiles,
@@ -16,11 +17,14 @@ import {
   selectedOverlay,
   writeConfigDoc,
 } from "./ue-mcp-config.js";
-import { setInstalledHooks, setFeedbackMode, type FeedbackMode } from "./user-state.js";
+import { setInstalledHooks } from "./hook-state.js";
+import { FEEDBACK_MODE } from "./modes.js";
 import { resolveUProjectPath } from "./uproject-path.js";
 import { readEnv } from "../core/env.js";
+import type { ContextStrategy } from "./context-strategy.js";
 
-export interface PluginInfo {
+/** An Unreal plugin with a Content folder, found on disk, and where it mounts. */
+export interface ContentPluginMount {
   name: string;
   contentDir: string;
   mountPoint: string;
@@ -29,11 +33,12 @@ export interface PluginInfo {
 export interface UeMcpConfig {
   /** Content roots to search by default (e.g. ["/Game/", "/GASP/", "/MyPlugin/"]) */
   contentRoots?: string[];
-  /** Tool categories to disable (e.g. ["gas", "networking", "pcg"]) */
+  /** Tool categories to turn off (e.g. ["gas", "networking", "pcg"]). An entry
+   *  may carry a scope: `animation:epic` takes out only the actions wrapping
+   *  Unreal's toolsets, `level:native` only ue-mcp's own (see category-state.ts). */
   disable?: string[];
-  /** Native (Epic 5.8 ToolsetRegistry) tool surfacing. Enabled by default;
-   *  `exclude` names ue-mcp categories that should not be enriched with Epic
-   *  tools (they remain reachable via the `epic` gateway). */
+  /** Native (UE 5.8+ ToolsetRegistry) tool surfacing. Enabled by default.
+   *  `exclude` is deprecated: it is read as `disable: [<category>:epic]`. */
   nativeTools?: {
     enabled?: boolean;
     exclude?: string[];
@@ -50,8 +55,19 @@ export interface UeMcpConfig {
   editor?: {
     path?: string;
     buildToolPath?: string;
-    /** Extra command-line arguments start_editor and restart_editor pass to this project's editor. */
+    /** Extra command-line arguments start_editor and restart_editor pass to this project's editor,
+     *  after the window and IDE mode arguments and before a per-call `extraArgs`. */
     launchArgs?: string[];
+    /** How start_editor and restart_editor launch this project's editor:
+     *  `normal` (default, today's behaviour) or `offscreen`, which passes
+     *  -RenderOffScreen so no editor window appears on screen. A per-call
+     *  `window` parameter overrides it. */
+    window?: "normal" | "offscreen";
+    /** Whether that editor may open an IDE: `allow`, or `none`, which passes
+     *  the NullSourceCodeAccessor ini override so the editor opens no IDE.
+     *  Unset = `none` for an offscreen editor and `allow` otherwise. A per-call
+     *  `ide` parameter overrides it. */
+    ide?: "allow" | "none";
   };
   /** Per-project equivalent of UE_MCP_ENV (#817): the `ue-mcp.<env>.yml`
    *  overlay this project merges. The env var still wins. */
@@ -62,10 +78,17 @@ export interface UeMcpConfig {
     enabled?: boolean;
     ttlSeconds?: number;
   };
+  /** Asset leases for agents sharing one editor (see dispatch/leases.ts).
+   *  `auto` by default: explicit leases always, implicit ones while more than
+   *  one MCP session is connected. */
+  leases?: {
+    mode?: "auto" | "on" | "off";
+    ttlSeconds?: number;
+  };
   /** Optional HTTP surface for flow.run (#144). Disabled by default. */
   http?: {
     enabled?: boolean;
-    /** Default 7723. Bound to 127.0.0.1 only. */
+    /** Default FLOW_HTTP_PORT (core/flow-http-port.ts). Bound to 127.0.0.1 only. */
     port?: number;
     /** Override bind host. Defaults to 127.0.0.1 - do not expose externally. */
     host?: string;
@@ -75,7 +98,7 @@ export interface UeMcpConfig {
    *  signatures on demand; `full` lists every action's signature inline. See
    *  lean-context.ts and micro-context.ts. */
   context?: {
-    strategy?: "full" | "lean" | "micro";
+    strategy?: ContextStrategy;
   };
   /** How `ue-mcp <uproject>` serves: `daemon` (default) or `in-process`.
    *  UE_MCP_SERVER_MODE wins. See src/daemon/server-mode.ts. */
@@ -116,6 +139,8 @@ export interface UeMcpConfig {
 export interface UeMcpConfigRejection {
   key: string;
   message: string;
+  /** Every validation issue under the key, its path relative to the key (`window`, `launchArgs.0`). */
+  issues: Array<{ path: string; message: string }>;
 }
 
 const rejectionsByDir = new Map<string, UeMcpConfigRejection[]>();
@@ -157,7 +182,7 @@ export function partitionUeMcpConfig(block: unknown): {
   if (block === null || typeof block !== "object" || Array.isArray(block)) {
     return {
       config: {},
-      rejected: [{ key: "ue-mcp", message: "the block is not a mapping of settings" }],
+      rejected: [{ key: "ue-mcp", message: "the block is not a mapping of settings", issues: [] }],
     };
   }
 
@@ -178,9 +203,14 @@ export function partitionUeMcpConfig(block: unknown): {
       if (one.data !== undefined) kept[key] = one.data;
       continue;
     }
-    const issue = one.error?.issues?.[0];
+    const issues = one.error?.issues ?? [];
+    const issue = issues[0];
     const where = issue && issue.path.length > 0 ? `${key}.${issue.path.join(".")}: ` : "";
-    rejected.push({ key, message: `${where}${issue?.message ?? "invalid value"}` });
+    rejected.push({
+      key,
+      message: `${where}${issue?.message ?? "invalid value"}`,
+      issues: issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+    });
   }
 
   // The survivors are parsed again as a whole, so the returned object is one
@@ -191,7 +221,7 @@ export function partitionUeMcpConfig(block: unknown): {
   if (!again.success) {
     return {
       config: {},
-      rejected: [...rejected, { key: "ue-mcp", message: "the surviving keys still did not validate together" }],
+      rejected: [...rejected, { key: "ue-mcp", message: "the surviving keys still did not validate together", issues: [] }],
     };
   }
   return { config: again.data, rejected };
@@ -287,6 +317,9 @@ export class ProjectContext {
         `'contentPath' must be a mount path such as /Game or /Game/Characters (got '${contentPath}').`,
       );
     }
+    if (normalized.split("/").some((part) => part === "." || part === "..")) {
+      throw new Error(`'contentPath' names a folder inside a mount and cannot contain '.' or '..' (got '${contentPath}').`);
+    }
     if (isGamePath(normalized)) {
       if (!this.contentDir) throw new Error("No project is loaded, so /Game has no directory to read.");
       return path.join(this.contentDir, ...stripGamePrefix(normalized).split("/").filter(Boolean));
@@ -368,11 +401,11 @@ export class ProjectContext {
    * caching for the lifetime of the server is fine because plugin layouts
    * don't change while the editor is running.
    */
-  private _pluginCache: PluginInfo[] | null = null;
+  private _pluginCache: ContentPluginMount[] | null = null;
 
-  discoverPlugins(): PluginInfo[] {
+  discoverPlugins(): ContentPluginMount[] {
     if (this._pluginCache) return this._pluginCache;
-    const plugins: PluginInfo[] = [];
+    const plugins: ContentPluginMount[] = [];
     const seen = new Set<string>();
     function scan(dir: string): void {
       let entries: fs.Dirent[];
@@ -457,27 +490,17 @@ export class ProjectContext {
 }
 
 /**
- * Load the `ue-mcp:` block with the full layered cascade, each
- * layer deep-merged over the one before (low -> high precedence):
- *
- *     ~/.ue-mcp/config.yml   (user-global, untracked)
- *     <project>/ue-mcp.yml   (project, tracked)
- *     ue-mcp.{env}.yml       (env overlay, when UE_MCP_ENV is set)
- *     ue-mcp.local.yml       (per-machine, untracked)
- *
- * Env vars (UE_MCP_CONTEXT_STRATEGY, ...) still win over the merged result;
- * they are applied where each setting is consumed, not here. Machine *state*
- * (installedHooks, feedback mode) is not config and never merged - it lives in
- * ~/.ue-mcp/state.json.
+ * Load the `ue-mcp:` block with the layered cascade configLayerFiles lists,
+ * each layer deep-merged over the one before. Env vars still win over the
+ * merged result; they are applied where each setting is read (resolveSetting
+ * in core/env.ts), not here. Machine state is not config and is never merged:
+ * it lives in ~/.ue-mcp/state.json.
  */
 function loadLayeredUeMcpBlock(projectDir: string): Record<string, unknown> {
-  const global = readGlobalUeMcpBlock();
-  const project = readUeMcpBlock(projectConfigPath(projectDir));
-
-  const layers: Record<string, unknown>[] = [global, project];
-  for (const layer of configLayerFiles(projectDir, overlayFor(projectDir))) {
-    if (layer.target === "env" || layer.target === "local") layers.push(readUeMcpBlock(layer.file));
-  }
+  const layers = configLayerFiles(projectDir, overlayFor(projectDir)).map((layer) =>
+    // The global layer has its own reader, which warns on a file it cannot parse.
+    layer.target === "global" ? readGlobalUeMcpBlock() : readUeMcpBlock(layer.file),
+  );
 
   return layers.reduce(
     (acc, layer) => deepMerge(acc, layer) as Record<string, unknown>,
@@ -584,10 +607,10 @@ function migrateLegacyFeedbackModeInYaml(projectDir: string): void {
   const block = (doc["ue-mcp"] as Record<string, unknown> | undefined) ?? {};
   const feedback = block.feedback as { mode?: unknown } | undefined;
   if (!feedback || typeof feedback.mode !== "string") return;
-  const mode = feedback.mode;
-  if (mode !== "interactive" && mode !== "auto-approve" && mode !== "defer") return;
+  const mode = FEEDBACK_MODE.parse(feedback.mode);
+  if (!mode) return;
 
-  setFeedbackMode(mode as FeedbackMode);
+  FEEDBACK_MODE.set(mode);
 
   // Strip from yaml.
   delete (block as Record<string, unknown>).feedback;

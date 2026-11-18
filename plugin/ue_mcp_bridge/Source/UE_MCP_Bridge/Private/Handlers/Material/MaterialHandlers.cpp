@@ -7,6 +7,8 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "MaterialDomain.h"
+#include "MaterialShared.h"
+#include "UObject/UObjectIterator.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstance.h"
 #include "Materials/MaterialInstanceConstant.h"
@@ -65,6 +67,32 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 	// before anything failed, duplicate_material (it makes the destination
 	// folder first) and the transaction pair.
 	using EType = EMCPParamType;
+	Registry.RegisterHandler(TEXT("insert_expression_between"), &InsertExpressionBetween, {
+		MCPParam::Required(TEXT("materialPath"), EType::String, TEXT("Material asset path")),
+		MCPParam::Optional(TEXT("targetExpression"), EType::String, TEXT("Target expression name; pass this or property")),
+		MCPParam::Optional(TEXT("property"), EType::String, TEXT("Target material property, including MaterialAttributes")),
+		MCPParam::Optional(TEXT("targetInput"), EType::String, TEXT("Target input name or index; default first input")),
+		MCPParam::Required(TEXT("expressionType"), EType::String, TEXT("New material expression class or short name")),
+		MCPParam::Optional(TEXT("inputForUpstream"), EType::String, TEXT("New node input for the previous source; default first input")),
+		MCPParam::Optional(TEXT("properties"), EType::Object, TEXT("Editable reflected properties on the new expression")),
+	}, MCPSpec::ExactlyOne({ { TEXT("targetExpression") }, { TEXT("property") } }));
+	Registry.RegisterHandler(TEXT("restore_expression_insertion"), &RestoreExpressionInsertion, {
+		MCPParam::Required(TEXT("materialPath"), EType::String, TEXT("Material asset path")),
+		MCPParam::Required(TEXT("expressionName"), EType::String, TEXT("Inserted node name from the rollback record")),
+		MCPParam::Required(TEXT("insertion"), EType::Object, TEXT("Original insertion parameters from the rollback record")),
+		MCPParam::Required(TEXT("previousSource"), EType::Object, TEXT("Original source and channel masks from the rollback record")),
+	});
+	Registry.RegisterHandler(TEXT("read_material_summary"), &ReadMaterialSummary, {
+		MCPParam::Required(TEXT("materialPath"), EType::String, TEXT("Material asset path")),
+		MCPParam::Optional(TEXT("classes"), EType::Array, TEXT("Expression classes to include, full or short names")).Items(EType::String),
+		MCPParam::Optional(TEXT("parameterNames"), EType::Array, TEXT("Parameter names to include; intersects classes when both are supplied")).Items(EType::String),
+		MCPParam::Optional(TEXT("propertyChain"), EType::Object, TEXT("One property or named expression input and upstream depth limit")).WithFields({
+			MCPParam::OptionalField(TEXT("property"), EType::String, TEXT("Root material property")),
+			MCPParam::OptionalField(TEXT("targetExpression"), EType::String, TEXT("Root expression instead of property")),
+			MCPParam::OptionalField(TEXT("targetInput"), EType::String, TEXT("Root expression input name or index")),
+			MCPParam::OptionalField(TEXT("depthLimit"), EType::Integer, TEXT("Maximum upstream depth from 0 to 64; default 8")),
+		}),
+	});
 	auto SpecAssetPath = [](const TCHAR* Description)
 	{
 		return MCPParam::Required(TEXT("assetPath"), EType::String, Description).Alias(TEXT("path"));
@@ -154,6 +182,10 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 			MCPParam::OptionalField(TEXT("outputIndex"), EType::Integer, TEXT("Source output index, instead of output")),
 		});
 	};
+	auto SpecRemoveExpressions = []()
+	{
+		return MCPParam::Optional(TEXT("removeExpressions"), EType::Array, TEXT("Existing expressions to delete once the new nodes are wired, named as delete_expression takes them (description, class, parameter name, index or engine name). Resolved before anything changes; a connection may not use one (#1461)")).Items(EType::String);
+	};
 	auto SpecSourceExpression = []()
 	{
 		return MCPParam::Required(TEXT("sourceExpression"), EType::String, TEXT("Expression the wire leaves (name, or index inside a MaterialFunction)"));
@@ -184,7 +216,7 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 	};
 	auto SpecOnConflict = []()
 	{
-		return MCPParam::Optional(TEXT("onConflict"), EType::String, TEXT("When the asset exists: skip (default, report it) | error"));
+		return MCPSharedParam::OnConflict();
 	};
 	// A material graph or a MaterialFunction graph (#1138): one or the other.
 	const FMCPParamSpec SpecGraphMaterialPath = MCPParam::Optional(TEXT("materialPath"), EType::String, TEXT("Material asset path")).Alias(TEXT("path")).Alias(TEXT("assetPath"));
@@ -194,15 +226,15 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 	// #952: a colour arrives as value or color, shaped {r,g,b,a}, [r,g,b,a] or UE struct text.
 	const FMCPParamSpec SpecColorValue = MCPParam::Optional(TEXT("color"), EType::Color, TEXT("A colour or vector value, instead of value")).Alias(TEXT("colour"));
 	// A placed component's material (#1114, #1131): the asset, or the actor holding it.
-	const FMCPParamSpec SpecActorLabel = MCPParam::Optional(TEXT("actorLabel"), EType::String, TEXT("Label of the actor whose component material to read; a label naming several actors is refused"));
-	const FMCPParamSpec SpecActorPath = MCPParam::Optional(TEXT("actorPath"), EType::String, TEXT("Full object path of that actor; the unambiguous selector"));
+	const FMCPParamSpec SpecActorLabel = MCPSharedParam::ActorLabel().Describe(TEXT("Label of the actor whose component material to read; a label naming several actors is refused"));
+	const FMCPParamSpec SpecActorPath = MCPSharedParam::ActorPath().Describe(TEXT("Full object path of that actor; the unambiguous selector"));
 	const FMCPParamSpec SpecComponentName = MCPParam::Optional(TEXT("componentName"), EType::String, TEXT("Primitive component whose material slot to read (default: the first with material slots)"));
 	const FMCPParamSpec SpecSlotIndex = MCPParam::Optional(TEXT("slotIndex"), EType::Integer, TEXT("Material slot index on the component (default 0)"));
 	const FMCPParamSpec SpecSlotName = MCPParam::Optional(TEXT("slotName"), EType::String, TEXT("Material slot name, instead of slotIndex"));
-	const FMCPParamSpec SpecPieInstance = MCPParam::Optional(TEXT("pieInstance"), EType::Number, TEXT("Which PIE world when several run (0 = server/primary). See editor(list_pie_instances)"));
+	const FMCPParamSpec SpecPieInstance = MCPSharedParam::PieInstance();
 	auto SpecWorld = [](const TCHAR* Description)
 	{
-		return MCPParam::Optional(TEXT("world"), EType::String, Description);
+		return MCPSharedParam::World().Describe(Description);
 	};
 	const FMCPSpecRules ActorChoice = MCPSpec::ExactlyOne({ { TEXT("actorLabel") }, { TEXT("actorPath") } });
 	const FMCPSpecRules AssetOrActorChoice = MCPSpec::ExactlyOne({ { TEXT("assetPath") }, { TEXT("actorLabel") }, { TEXT("actorPath") } });
@@ -251,6 +283,7 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 		MCPParam::Optional(TEXT("defaultValue"), EType::Number, TEXT("ScalarParameter default (a number) or VectorParameter default ({r,g,b,a})")).Or(EType::Object),
 		MCPParam::Optional(TEXT("value"), EType::Any, TEXT("A number for Constant, {r,g,b} for Constant3Vector, {x,y} for Constant2Vector")),
 		MCPParam::Optional(TEXT("channels"), EType::Object, TEXT("ComponentMask channels {r,g,b,a} as bools")),
+		MCPParam::Optional(TEXT("properties"), EType::Object, TEXT("Any other UPROPERTY on the node by name, e.g. {ConstB: 12.92} on Divide, {ConstY: 0.04} on Step, {ConstExponent: 2.4} on Power. A bad name or value adds nothing")),
 		SpecPositionX(),
 		SpecPositionY(),
 	});
@@ -305,8 +338,8 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 	}, InstanceReadChoice);
 	Registry.RegisterHandler(TEXT("read_material_parameter_collection"), &ReadMaterialParameterCollection, {
 		SpecAssetPath(TEXT("MaterialParameterCollection asset path")),
-		MCPParam::Optional(TEXT("world"), EType::String, TEXT("World whose live collection instance to read: editor, pie or auto. Omit for the stored defaults only")),
-		MCPParam::Optional(TEXT("pieInstance"), EType::Number, TEXT("Which PIE world when several run (0 = server/primary). See editor(list_pie_instances)")),
+		MCPSharedParam::World().Describe(TEXT("World whose live collection instance to read: editor, pie or auto. Omit for the stored defaults only")),
+		MCPSharedParam::PieInstance(),
 	});
 	Registry.RegisterHandler(TEXT("set_material_instance_parent"), &SetMaterialInstanceParent, {
 		SpecAnyAssetPath(TEXT("MaterialInstanceConstant asset path")),
@@ -399,16 +432,18 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 		SpecGraphNodes(),
 		SpecGraphConnections(),
 		SpecPropertyConnections(),
+		SpecRemoveExpressions(),
 	});
 	Registry.RegisterHandler(TEXT("build_material_graph"), &BuildMaterialGraph, {
 		SpecGraphAssetPath(),
 		SpecGraphNodes(),
 		SpecGraphConnections(),
 		SpecPropertyConnections(),
+		SpecRemoveExpressions(),
 	});
 	Registry.RegisterHandler(TEXT("delete_orphan_expressions"), &DeleteOrphanExpressions, {
 		SpecGraphAssetPath(),
-		MCPParam::Optional(TEXT("dryRun"), EType::Boolean, TEXT("List the orphans without deleting them (default false)")),
+		MCPSharedParam::DryRun().Describe(TEXT("List the orphans without deleting them (default false)")),
 	});
 	Registry.RegisterHandler(TEXT("render_material_preview"), &RenderMaterialPreview, {
 		SpecGraphAssetPath(),
@@ -512,15 +547,15 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 	});
 	Registry.RegisterHandler(TEXT("add_rvt_volume"), &AddRvtVolume, {
 		SpecRvtPath(),
-		MCPParam::Optional(TEXT("actorLabel"), EType::String, TEXT("Editor label for the new volume (default RVTVolume_<rvt name>)")),
+		MCPSharedParam::ActorLabel().Describe(TEXT("Editor label for the new volume (default RVTVolume_<rvt name>)")),
 		MCPParam::Optional(TEXT("boundsMode"), EType::String, TEXT("writers (cover every primitive writing into this RVT) | alignActor (match one actor's box and rotation)")),
 		MCPParam::Optional(TEXT("boundsAlignActor"), EType::String, TEXT("Actor label or object path whose rotation and bounds the volume aligns to, typically the landscape")),
 	});
 	// The volume by name, or found from the RVT it is bound to.
 	Registry.RegisterHandler(TEXT("set_rvt_volume_bounds"), &SetRvtVolumeBounds, {
 		MCPParam::Optional(TEXT("rvtPath"), EType::String, TEXT("RuntimeVirtualTexture whose one bound volume to refit")).Alias(TEXT("assetPath")),
-		MCPParam::Optional(TEXT("actorLabel"), EType::String, TEXT("Label of the RuntimeVirtualTextureVolume")),
-		MCPParam::Optional(TEXT("actorPath"), EType::String, TEXT("Full object path of the RuntimeVirtualTextureVolume")),
+		MCPSharedParam::ActorLabel().Describe(TEXT("Label of the RuntimeVirtualTextureVolume")),
+		MCPSharedParam::ActorPath().Describe(TEXT("Full object path of the RuntimeVirtualTextureVolume")),
 		MCPParam::Optional(TEXT("boundsMode"), EType::String, TEXT("writers (default: cover every primitive writing into this RVT) | alignActor (match one actor's box and rotation)")),
 		MCPParam::Optional(TEXT("boundsAlignActor"), EType::String, TEXT("Actor label or object path whose rotation and bounds the volume aligns to, typically the landscape")),
 	}, MCPSpec::ExactlyOne({ { TEXT("rvtPath") }, { TEXT("actorLabel") }, { TEXT("actorPath") } }));
@@ -543,8 +578,8 @@ void FMaterialHandlers::RegisterHandlers(FMCPHandlerRegistry& Registry)
 	});
 	// rvtPaths wins over rvtPath; assignMode=set with neither clears the list.
 	Registry.RegisterHandler(TEXT("assign_rvt_to_landscape"), &AssignRvtToLandscape, {
-		MCPParam::Optional(TEXT("actorLabel"), EType::String, TEXT("Label of the landscape")),
-		MCPParam::Optional(TEXT("actorPath"), EType::String, TEXT("Full object path of the landscape")),
+		MCPSharedParam::ActorLabel().Describe(TEXT("Label of the landscape")),
+		MCPSharedParam::ActorPath().Describe(TEXT("Full object path of the landscape")),
 		MCPParam::Optional(TEXT("rvtPaths"), EType::Array, TEXT("RuntimeVirtualTexture asset paths")).Items(EType::String),
 		MCPParam::Optional(TEXT("rvtPath"), EType::String, TEXT("One RuntimeVirtualTexture asset path, instead of rvtPaths")),
 		MCPParam::Optional(TEXT("assignMode"), EType::String, TEXT("set (default: replace the list) | add | remove")),
@@ -829,6 +864,63 @@ namespace
 		return ConnectionsObj;
 	}
 
+	FString MaterialCustomOutputTypeName(ECustomMaterialOutputType Type)
+	{
+		switch (Type)
+		{
+		case CMOT_Float1: return TEXT("float1");
+		case CMOT_Float2: return TEXT("float2");
+		case CMOT_Float3: return TEXT("float3");
+		case CMOT_Float4: return TEXT("float4");
+		case CMOT_MaterialAttributes: return TEXT("materialattributes");
+		default: return FString::FromInt(static_cast<int32>(Type));
+		}
+	}
+
+	/** A Custom node's HLSL and declarations, so a graph read can be checked against source in one call (#1645). */
+	TSharedPtr<FJsonObject> MaterialCustomExpressionJson(const UMaterialExpressionCustom* Custom)
+	{
+		TSharedPtr<FJsonObject> Obj = MakeShared<FJsonObject>();
+		Obj->SetStringField(TEXT("code"), Custom->Code);
+		Obj->SetStringField(TEXT("description"), Custom->Description);
+		Obj->SetStringField(TEXT("outputType"), MaterialCustomOutputTypeName(Custom->OutputType));
+
+		TArray<TSharedPtr<FJsonValue>> Inputs;
+		for (const FCustomInput& Input : Custom->Inputs)
+		{
+			Inputs.Add(MakeShared<FJsonValueString>(Input.InputName.ToString()));
+		}
+		Obj->SetArrayField(TEXT("inputNames"), Inputs);
+
+		TArray<TSharedPtr<FJsonValue>> Outputs;
+		for (const FCustomOutput& Output : Custom->AdditionalOutputs)
+		{
+			TSharedPtr<FJsonObject> OutputObj = MakeShared<FJsonObject>();
+			OutputObj->SetStringField(TEXT("name"), Output.OutputName.ToString());
+			OutputObj->SetStringField(TEXT("outputType"), MaterialCustomOutputTypeName(Output.OutputType));
+			Outputs.Add(MakeShared<FJsonValueObject>(OutputObj));
+		}
+		Obj->SetArrayField(TEXT("additionalOutputs"), Outputs);
+
+		TArray<TSharedPtr<FJsonValue>> Defines;
+		for (const FCustomDefine& Define : Custom->AdditionalDefines)
+		{
+			TSharedPtr<FJsonObject> DefineObj = MakeShared<FJsonObject>();
+			DefineObj->SetStringField(TEXT("name"), Define.DefineName);
+			DefineObj->SetStringField(TEXT("value"), Define.DefineValue);
+			Defines.Add(MakeShared<FJsonValueObject>(DefineObj));
+		}
+		Obj->SetArrayField(TEXT("additionalDefines"), Defines);
+
+		TArray<TSharedPtr<FJsonValue>> Includes;
+		for (const FString& Include : Custom->IncludeFilePaths)
+		{
+			Includes.Add(MakeShared<FJsonValueString>(Include));
+		}
+		Obj->SetArrayField(TEXT("includeFilePaths"), Includes);
+		return Obj;
+	}
+
 	/** One list_expressions / read_graph row. */
 	TSharedPtr<FJsonObject> MaterialExpressionRowJson(
 		UMaterialExpression* Expression, int32 Index, bool bIncludeInputs,
@@ -854,6 +946,10 @@ namespace
 		if (bIncludeInputs)
 		{
 			ExprObj->SetArrayField(TEXT("inputs"), MaterialExpressionInputsJson(Expression, IndexByExpression));
+			if (const UMaterialExpressionCustom* Custom = Cast<UMaterialExpressionCustom>(Expression))
+			{
+				ExprObj->SetObjectField(TEXT("custom"), MaterialCustomExpressionJson(Custom));
+			}
 		}
 		return ExprObj;
 	}
@@ -2083,6 +2179,8 @@ TSharedPtr<FJsonValue> FMaterialHandlers::AddMaterialExpression(const TSharedPtr
 	// Read on the new node, after the load; which ones apply depends on its class.
 	MCPReadParamsAhead(Params, { TEXT("name"), TEXT("parameterName"), TEXT("group"), TEXT("sortPriority"),
 		TEXT("defaultValue"), TEXT("value"), TEXT("channels"), TEXT("positionX"), TEXT("positionY") });
+	const TSharedPtr<FJsonObject>* Properties = nullptr;
+	const bool bHasProperties = TryGetObjectParam(Params, TEXT("properties"), Properties) && Properties;
 
 	UMaterial* Material = LoadMaterialFromPath(MaterialPath);
 	if (!Material)
@@ -2102,6 +2200,18 @@ TSharedPtr<FJsonValue> FMaterialHandlers::AddMaterialExpression(const TSharedPtr
 	Material->GetExpressionCollection().AddExpression(NewExpression);
 
 	ApplyExpressionSpec(NewExpression, Params);
+
+	// #1461: per-node constants in the same call. A bad one removes the node again.
+	if (bHasProperties)
+	{
+		FString PropError;
+		if (!ApplyExpressionProperties(NewExpression, *Properties, PropError))
+		{
+			UMaterialEditingLibrary::DeleteMaterialExpression(Material, NewExpression);
+			Material->PostEditChange();
+			return MCPError(FString::Printf(TEXT("%s. Nothing was added."), *PropError));
+		}
+	}
 
 	// Set position
 	double PosX = 0, PosY = 0;
@@ -3502,6 +3612,53 @@ TSharedPtr<FJsonValue> FMaterialHandlers::SetMaterialStaticSwitch(const TSharedP
 	return MCPResult(Result);
 }
 
+namespace
+{
+	// #1441: what the renderer will draw for a material and its loaded instances
+	// that compile their own shader maps. A finished resource without a valid
+	// shader map renders as the default material. Read without blocking: a
+	// resource still compiling is reported as such, not waited on.
+	TSharedPtr<FJsonObject> DescribeMaterialShaderState(UMaterial* Material)
+	{
+		TSharedPtr<FJsonObject> State = MakeShared<FJsonObject>();
+		const FMaterialResource* Resource = Material ? Material->GetMaterialResource(GMaxRHIShaderPlatform) : nullptr;
+		const bool bFinished = Resource && Resource->IsCompilationFinished();
+		State->SetBoolField(TEXT("compiling"), Resource && !bFinished);
+		if (bFinished)
+		{
+			State->SetBoolField(TEXT("validShaderMap"), Resource->HasValidGameThreadShaderMap());
+			TArray<TSharedPtr<FJsonValue>> Errors;
+			for (const FString& Error : Resource->GetCompileErrors()) Errors.Add(MakeShared<FJsonValueString>(Error));
+			State->SetArrayField(TEXT("resourceCompileErrors"), Errors);
+		}
+
+		TArray<TSharedPtr<FJsonValue>> Fallbacks;
+		int32 PermutationChildren = 0;
+		int32 ChildrenCompiling = 0;
+		for (TObjectIterator<UMaterialInstance> It; It; ++It)
+		{
+			UMaterialInstance* Instance = *It;
+			if (!Instance || !Instance->bHasStaticPermutationResource || !Instance->IsChildOf(Material)) continue;
+			++PermutationChildren;
+			const FMaterialResource* ChildResource = Instance->GetMaterialResource(GMaxRHIShaderPlatform);
+			if (!ChildResource) continue;
+			if (!ChildResource->IsCompilationFinished()) { ++ChildrenCompiling; continue; }
+			if (!ChildResource->HasValidGameThreadShaderMap())
+			{
+				Fallbacks.Add(MakeShared<FJsonValueString>(Instance->GetPathName()));
+			}
+		}
+		State->SetNumberField(TEXT("staticPermutationChildren"), PermutationChildren);
+		State->SetNumberField(TEXT("childrenCompiling"), ChildrenCompiling);
+		State->SetArrayField(TEXT("childrenWithoutShaderMap"), Fallbacks);
+		if (!bFinished || ChildrenCompiling > 0)
+		{
+			State->SetStringField(TEXT("note"), TEXT("Shaders were still compiling when this call returned. editor(get_shader_compile_status, waitUntilIdle=true) waits for them."));
+		}
+		return State;
+	}
+}
+
 TSharedPtr<FJsonValue> FMaterialHandlers::SetExpressionValue(const TSharedPtr<FJsonObject>& Params)
 {
 	// Read by the branch the node's class selects, after the graph load. x and y
@@ -3538,6 +3695,7 @@ TSharedPtr<FJsonValue> FMaterialHandlers::SetExpressionValue(const TSharedPtr<FJ
 
 	FString ExpressionClass = Expression->GetClass()->GetName();
 	bool bValueSet = false;
+	bool bTextureChanged = false;
 
 	auto Result = MCPSuccess();
 
@@ -3692,9 +3850,22 @@ TSharedPtr<FJsonValue> FMaterialHandlers::SetExpressionValue(const TSharedPtr<FJ
 				{
 					RollbackBlockedReason = TEXT("The TextureSample had no texture before this call, and set_expression_value cannot clear one: an empty texturePath is rejected as an unloadable asset.");
 				}
+				// #1441: the property-edit path a native texture swap takes. The
+				// node's PostEditChangeProperty re-derives the sampler type and
+				// texture-reference state that a bare field write leaves stale.
+				FProperty* TextureProp = TexSampleExpr->GetClass()->FindPropertyByName(TEXT("Texture"));
+				TexSampleExpr->Modify();
+				TexSampleExpr->PreEditChange(TextureProp);
 				TexSampleExpr->Texture = Texture;
+				FPropertyChangedEvent TextureChanged(TextureProp, EPropertyChangeType::ValueSet);
+				TexSampleExpr->PostEditChangeProperty(TextureChanged);
 				bValueSet = true;
+				bTextureChanged = true;
 				Result->SetStringField(TEXT("texturePath"), Texture->GetPathName());
+				if (const UEnum* SamplerEnum = StaticEnum<EMaterialSamplerType>())
+				{
+					Result->SetStringField(TEXT("samplerType"), SamplerEnum->GetNameStringByValue(static_cast<int64>(TexSampleExpr->SamplerType.GetValue())));
+				}
 			}
 			else
 			{
@@ -3798,7 +3969,18 @@ TSharedPtr<FJsonValue> FMaterialHandlers::SetExpressionValue(const TSharedPtr<FJ
 				FString PreviousValueText;
 				Prop->ExportText_Direct(PreviousValueText, ValuePtr, ValuePtr, Expression, PPF_None);
 
+				// Wrapped in the node's own edit notifications, as a details-panel
+				// edit is, so nodes that derive state from a property (a texture
+				// node's sampler type, a Noise node's outputs) rebuild it.
+				Expression->Modify();
+				Expression->PreEditChange(Prop);
 				const TCHAR* ImportResult = Prop->ImportText_Direct(*ValueStr, ValuePtr, Expression, PPF_None);
+				FPropertyChangedEvent PropertyChanged(Prop, EPropertyChangeType::ValueSet);
+				Expression->PostEditChangeProperty(PropertyChanged);
+				if (ImportResult && CastField<FObjectPropertyBase>(Prop) && Cast<UTexture>(CastField<FObjectPropertyBase>(Prop)->GetObjectPropertyValue(ValuePtr)))
+				{
+					bTextureChanged = true;
+				}
 				if (ImportResult)
 				{
 					bValueSet = true;
@@ -3851,7 +4033,27 @@ TSharedPtr<FJsonValue> FMaterialHandlers::SetExpressionValue(const TSharedPtr<FJ
 		return MCPError(FString::Printf(TEXT("Could not set value on expression of type '%s'. For known types provide standard value params; for arbitrary expressions pass 'propertyName' + 'value'."), *ExpressionClass));
 	}
 
-	Target.PostEdit();
+	// #1441: a texture write recompiles through the editor's RecompileMaterial,
+	// which also re-caches child instances with static permutations. It balances
+	// the PreEditChange taken above.
+	if (bTextureChanged && Target.Material)
+	{
+#if UE_MCP_HAS_5_8_API
+		const TArray<FString> CompileErrors = UMaterialEditingLibrary::RecompileMaterial(Target.Material);
+		TArray<TSharedPtr<FJsonValue>> ErrorValues;
+		for (const FString& Error : CompileErrors) ErrorValues.Add(MakeShared<FJsonValueString>(Error));
+		Result->SetArrayField(TEXT("compileErrors"), ErrorValues);
+#else
+		UMaterialEditingLibrary::RecompileMaterial(Target.Material);
+		Result->SetStringField(TEXT("compileErrorsNote"),
+			TEXT("compileErrors is not reported on this engine: UMaterialEditingLibrary::RecompileMaterial returns void before UE 5.8. Read the editor log for its errors."));
+#endif
+		Result->SetObjectField(TEXT("shaderState"), DescribeMaterialShaderState(Target.Material));
+	}
+	else
+	{
+		Target.PostEdit();
+	}
 
 	// #979: the value was written in memory and the package only marked dirty,
 	// so a caller who then asked something else to save it could be told the

@@ -35,7 +35,7 @@ Handlers without a natural key (such as `execute_command`) cannot be idempotent 
 Editor labels are **not unique**: copies of a Blueprint share a label, so the
 first match a level iterator reaches depends on streaming order. Every
 actor-targeting handler resolves its target through `MCPResolveActor` in
-`Public/HandlerActorResolve.h`, never through a loop of its own:
+`Private/HandlerActorResolve.h`, never through a loop of its own:
 
 ```cpp
 FString ActorLabel;
@@ -157,6 +157,22 @@ MCPCheckActorLabelExists(World, Label, OnConflict, FriendlyType?)
 // or writes an asset. Shared, never copied: see "File-local helpers and the
 // unity build" in development.md.
 MCPIsProtectedAssetPath(Path)
+MCPProtectedPathError(Path)                   // the refusal, with the copy-to-/Game route
+
+// The way forward a refusal names (Public/HandlerWayForward.h). A refusal
+// that stops the caller says what to call next; these write that sentence
+// once, so the advice cannot drift between handlers. Never hand-write one.
+MCPWorldUnavailableError(Scope)               // world=pie with no PIE running
+MCPEditorWorldUnavailableMessage()
+MCPNoPlayWorldMessage()
+MCPStopPlayInEditorStep()                     // editor(play_in_editor, pieAction="stop")
+MCPSaveOrDiscardStep()                        // level(save) / editor(save_dirty) / editor(discard_dirty)
+MCPPluginUnavailableError(What, PluginName)   // project(enable_plugin) + editor(restart_editor)
+MCPEnablePluginStep(PluginName)
+MCPRaiseOrSplitNote(Param, Current, Ceiling, HowToSplit) // "raise" only below the ceiling
+MCPHardCeilingNote(Param, Ceiling, HowToSplit)
+MCPBatchTooLargeError(Message, MaxPerCall)    // "split into several calls of N or fewer"
+MCPWithSplitNote(Message, MaxPerCall)
 
 // Actor lookup
 FindActorByLabel(World, Label)                // canonical label lookup
@@ -390,7 +406,7 @@ A handler declares its parameters at registration, and the TypeScript surface is
 - **A key a shared helper reads only on some paths is read ahead.** `MCPReadParamsAhead(Params, { ... })` at the top of the handler names every declared key, so the read set is the spec whatever path a call takes; the helpers still read each key where they use it.
 - **A timeout override takes the spec too.** `RegisterHandlerWithTimeout(name, fn, seconds, { ... })` registers both, and the TS action spreads `specBp(...)` and adds its `timeoutMs`.
 - **Never a routing name.** `action`, `timeoutMs`, `select`, `omit`, `editor` and `toEditor` are refused at registration and again by the generator.
-- **Change a spec, then re-record.** `npm run specs:record` against `tests/ue_mcp`, then `npm run specs:generate`, and commit the recording and the generated module together with the C++.
+- **Change a spec, then re-record.** Rebuild, open the editor on `tests/ue_mcp`, run `npm run generate -- --editor`, and commit the recording, its source fingerprint and the generated modules together with the C++. CI fails on a spec change that was not re-recorded.
 
 ## Checking a handler
 
