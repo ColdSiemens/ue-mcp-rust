@@ -18,6 +18,10 @@
 .PARAMETER EngineRoot
     Check one engine by folder instead (e.g. a source build), labelled -Label.
 
+.PARAMETER MaxParallel
+    Compile this many files at once, without Unreal's build accelerator. Use it
+    when builds stall on "memory pressure". Default: UBT's own choice.
+
 .EXAMPLE
     .\rust\tools\check-engine-compat.ps1
     .\rust\tools\check-engine-compat.ps1 -Versions 5.5
@@ -29,10 +33,12 @@ param(
     [string]$Label = 'custom',
     [string]$PluginDir = (Join-Path $PSScriptRoot '..\..\plugin\ue_mcp_bridge'),
     # Short on purpose: UE build paths fail past the 260-character Windows limit.
-    [string]$WorkDir = (Join-Path $env:TEMP 'uemcp-compat')
+    [string]$WorkDir = (Join-Path $env:TEMP 'uemcp-compat'),
+    [int]$MaxParallel = 0
 )
 
 $ErrorActionPreference = 'Stop'
+$parallelArgs = if ($MaxParallel -gt 0) { @('-NoUBA', "-MaxParallelActions=$MaxParallel") } else { @() }
 $PluginDir = (Resolve-Path $PluginDir).Path
 
 function Get-InstalledEngines {
@@ -112,7 +118,7 @@ foreach ($engine in $engines) {
     $log = Join-Path $dir 'build.log'
     Write-Host "Building against UE $($engine.Label) ($($engine.Root))..."
     $started = Get-Date
-    & (Join-Path $engine.Root 'Engine\Build\BatchFiles\Build.bat') "${name}Editor" Win64 Development "-Project=$dir\$name.uproject" -WaitMutex -NoHotReloadFromIDE "-Log=$dir\ubt.txt" *> $log
+    & (Join-Path $engine.Root 'Engine\Build\BatchFiles\Build.bat') "${name}Editor" Win64 Development "-Project=$dir\$name.uproject" -WaitMutex -NoHotReloadFromIDE "-Log=$dir\ubt.txt" @parallelArgs *> $log
     $code = $LASTEXITCODE
     $errors = @(Select-String -Path $log -Pattern ': (fatal )?error |error LNK|Unable to find plugin' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique)
     $results += [pscustomobject]@{
