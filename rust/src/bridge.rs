@@ -20,11 +20,14 @@ use std::time::{Duration, Instant};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot, Notify};
+use tokio_tungstenite::tungstenite::{self, Message};
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::header::{HeaderValue, AUTHORIZATION};
+use tokio_tungstenite::tungstenite::http::StatusCode;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
-use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, info, warn};
 
-use crate::config::PortResolver;
+use crate::config::{self, PortResolver};
 
 /// The plugin closes the socket on any inbound message larger than this.
 pub const BRIDGE_MAX_INBOUND_BYTES: usize = 64 * 1024 * 1024;
@@ -310,8 +313,18 @@ impl Bridge {
         let mut last_err = None;
         for port in self.resolver.candidates() {
             let url = format!("ws://127.0.0.1:{port}");
-            match tokio::time::timeout(Duration::from_secs(3), tokio_tungstenite::connect_async_with_config(url.as_str(), Some(config), true)).await {
+            let mut request = url.as_str().into_client_request()?;
+            if let Some(token) = config::read_bridge_token(port) {
+                request.headers_mut().insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {token}"))?);
+            }
+            match tokio::time::timeout(Duration::from_secs(3), tokio_tungstenite::connect_async_with_config(request, Some(config), true)).await {
                 Ok(Ok((ws, _))) => return self.run_session(conn, ws, port).await,
+                Ok(Err(tungstenite::Error::Http(resp))) if resp.status() == StatusCode::UNAUTHORIZED => {
+                    last_err = Some(anyhow::anyhow!(
+                        "{url}: the editor refused the session token. Its plugin writes one to {}/{port}.token when it starts; check that this server runs as the editor's user, or set UE_MCP_BRIDGE_TOKEN_DIR as the editor has it.",
+                        config::bridge_token_dir().map(|d| d.display().to_string()).unwrap_or_else(|| "~/.ue-mcp/bridge".into())
+                    ))
+                }
                 Ok(Err(e)) => last_err = Some(anyhow::anyhow!("{url}: {e}")),
                 Err(_) => last_err = Some(anyhow::anyhow!("{url}: connect timed out")),
             }

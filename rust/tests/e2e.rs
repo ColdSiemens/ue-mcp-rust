@@ -17,6 +17,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
+use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::Message;
 
@@ -33,6 +34,8 @@ fn all_sockets_up(status: &str) -> bool {
 
 #[derive(Default)]
 struct FakeState {
+    /// Like the plugin's session token: required as "Authorization: Bearer <token>" when set.
+    token: Option<String>,
     current: AtomicUsize,
     max: AtomicUsize,
     locks: Mutex<HashMap<String, String>>,
@@ -67,9 +70,13 @@ fn registered_methods() -> Vec<String> {
 
 impl FakeBridge {
     async fn start(port: u16) -> FakeBridge {
+        FakeBridge::start_with_token(port, None).await
+    }
+
+    async fn start_with_token(port: u16, token: Option<&str>) -> FakeBridge {
         let listener = TcpListener::bind(("127.0.0.1", port)).await.unwrap();
         let port = listener.local_addr().unwrap().port();
-        let state = Arc::new(FakeState::default());
+        let state = Arc::new(FakeState { token: token.map(str::to_string), ..Default::default() });
         let methods = Arc::new(registered_methods());
         let st = state.clone();
         let accept = tokio::spawn(async move {
@@ -90,9 +97,21 @@ impl FakeBridge {
     }
 }
 
+// The handshake callback's error type is tungstenite's, not ours to shrink.
+#[allow(clippy::result_large_err)]
 async fn serve_socket(stream: TcpStream, st: Arc<FakeState>, methods: Arc<Vec<String>>) {
     let config = WebSocketConfig { max_message_size: Some(PLUGIN_MAX_INBOUND), max_frame_size: Some(PLUGIN_MAX_INBOUND), ..Default::default() };
-    let Ok(ws) = tokio_tungstenite::accept_async_with_config(stream, Some(config)).await else { return };
+    let expected = st.token.clone();
+    let check = move |req: &Request, resp: Response| -> Result<Response, ErrorResponse> {
+        let sent = req.headers().get("authorization").and_then(|v| v.to_str().ok());
+        match &expected {
+            Some(t) if sent != Some(format!("Bearer {t}").as_str()) => {
+                Err(tokio_tungstenite::tungstenite::http::Response::builder().status(401).body(Some("bad or missing session token".into())).unwrap())
+            }
+            _ => Ok(resp),
+        }
+    };
+    let Ok(ws) = tokio_tungstenite::accept_hdr_async_with_config(stream, check, Some(config)).await else { return };
     let (mut sink, mut source) = ws.split();
     // Strictly one at a time, like a stock plugin's connection thread.
     while let Some(Ok(msg)) = source.next().await {
@@ -312,8 +331,13 @@ struct StdioHub {
 
 impl StdioHub {
     async fn start(bridge_port: u16) -> StdioHub {
+        StdioHub::start_with_env(bridge_port, &[]).await
+    }
+
+    async fn start_with_env(bridge_port: u16, env: &[(&str, &std::path::Path)]) -> StdioHub {
         let mut child = Command::new(env!("CARGO_BIN_EXE_ue-mcp-rs"))
             .args(["--bridge-port", &bridge_port.to_string(), "--connections", "4"])
+            .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -526,6 +550,29 @@ async fn separate_server_processes_share_the_editors_locks() {
     let (err, text) = session_b.call("niagara", "set_module_input", write("level")).await;
     assert!(!err, "{text}");
     fake.stop();
+}
+
+// The plugin publishes a per-session token at <dir>/<port>.token and refuses
+// an upgrade without it.
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_the_editors_session_token() {
+    let dir = std::env::temp_dir().join(format!("ue-mcp-rs-token-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let fake = FakeBridge::start_with_token(0, Some("s3cret")).await;
+    let token_file = dir.join(format!("{}.token", fake.port));
+
+    std::fs::write(&token_file, "s3cret\n").unwrap();
+    let mut hub = StdioHub::start_with_env(fake.port, &[("UE_MCP_BRIDGE_TOKEN_DIR", &dir)]).await;
+    let (err, text) = hub.call("level", "get_outliner", json!({})).await;
+    assert!(!err, "{text}");
+
+    std::fs::write(&token_file, "wrong").unwrap();
+    let mut refused = StdioHub::start_with_env(fake.port, &[("UE_MCP_BRIDGE_TOKEN_DIR", &dir)]).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let (_, text) = refused.call("project", "get_status", json!({})).await;
+    assert!(text.contains("\"connected\":false"), "a wrong token must not connect: {text}");
+    fake.stop();
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -113,6 +113,25 @@ fn read_port_file(path: &Path) -> Option<u16> {
     v.get("port")?.as_u64().and_then(|p| u16::try_from(p).ok())
 }
 
+/// Where the plugin publishes its per-session tokens: `UE_MCP_BRIDGE_TOKEN_DIR`,
+/// else `~/.ue-mcp/bridge`, with home read the way the plugin reads it.
+pub fn bridge_token_dir() -> Option<PathBuf> {
+    if let Some(dir) = std::env::var_os("UE_MCP_BRIDGE_TOKEN_DIR").filter(|d| !d.is_empty()) {
+        return Some(PathBuf::from(dir));
+    }
+    let home = if cfg!(windows) { std::env::var_os("USERPROFILE") } else { std::env::var_os("HOME") };
+    home.filter(|h| !h.is_empty()).map(|h| PathBuf::from(h).join(".ue-mcp").join("bridge"))
+}
+
+/// The token the editor on `port` requires as "Authorization: Bearer <token>"
+/// on the WebSocket upgrade. The plugin rewrites it every time it starts, so
+/// it is read again on every connect. None for a plugin that publishes none.
+pub fn read_bridge_token(port: u16) -> Option<String> {
+    let text = std::fs::read_to_string(bridge_token_dir()?.join(format!("{port}.token"))).ok()?;
+    let token = text.trim();
+    (!token.is_empty()).then(|| token.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
