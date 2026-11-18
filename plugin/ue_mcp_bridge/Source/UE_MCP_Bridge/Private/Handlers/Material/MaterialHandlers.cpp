@@ -3621,7 +3621,7 @@ namespace
 	TSharedPtr<FJsonObject> DescribeMaterialShaderState(UMaterial* Material)
 	{
 		TSharedPtr<FJsonObject> State = MakeShared<FJsonObject>();
-		const FMaterialResource* Resource = Material ? Material->GetMaterialResource(GMaxRHIShaderPlatform) : nullptr;
+		const FMaterialResource* Resource = Material ? Material->GetMaterialResource(UE_MCP_MATERIAL_RESOURCE_KEY) : nullptr;
 		const bool bFinished = Resource && Resource->IsCompilationFinished();
 		State->SetBoolField(TEXT("compiling"), Resource && !bFinished);
 		if (bFinished)
@@ -3640,7 +3640,7 @@ namespace
 			UMaterialInstance* Instance = *It;
 			if (!Instance || !Instance->bHasStaticPermutationResource || !Instance->IsChildOf(Material)) continue;
 			++PermutationChildren;
-			const FMaterialResource* ChildResource = Instance->GetMaterialResource(GMaxRHIShaderPlatform);
+			const FMaterialResource* ChildResource = Instance->GetMaterialResource(UE_MCP_MATERIAL_RESOURCE_KEY);
 			if (!ChildResource) continue;
 			if (!ChildResource->IsCompilationFinished()) { ++ChildrenCompiling; continue; }
 			if (!ChildResource->HasValidGameThreadShaderMap())

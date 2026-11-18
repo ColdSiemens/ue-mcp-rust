@@ -889,7 +889,16 @@ namespace UEMCPMVVM
 			}
 
 			FString Name = OptionalString(Params, TEXT("viewModelName"));
+#if UE_MCP_HAS_5_8_API
 			if (Name.IsEmpty()) Name = UMVVMEditorSubsystem::GetDefaultViewModelName(Class);
+#else
+			// 5.5.4 has no GetDefaultViewModelName; this is what 5.8's does.
+			if (Name.IsEmpty())
+			{
+				Name = Class->ClassGeneratedBy ? Class->ClassGeneratedBy->GetName() : Class->GetAuthoredName();
+				if (Cast<UBlueprintGeneratedClass>(Class) && Name.EndsWith(TEXT("_C"))) Name.LeftChopInline(2);
+			}
+#endif
 
 			UMVVMBlueprintView* View = Editor->RequestView(WidgetBlueprint);
 			if (!View)

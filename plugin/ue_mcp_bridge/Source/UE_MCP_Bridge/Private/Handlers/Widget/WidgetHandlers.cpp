@@ -1652,8 +1652,9 @@ TSharedPtr<FJsonValue> FWidgetHandlers::RenameWidget(const TSharedPtr<FJsonObjec
 	WidgetBP->Modify();
 	Widget->Modify();
 
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_8_API
 	// Moves the variable GUID to the new name, so references held by GUID survive.
+	// Not in 5.5.4, whose widget blueprints have no variable GUID map.
 	WidgetBP->OnVariableRenamed(OldFName, NewFName);
 #endif
 

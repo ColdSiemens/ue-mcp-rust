@@ -50,7 +50,12 @@
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "MCPEngineCompat.h"
+#if __has_include("Misc/StringOutputDevice.h")
 #include "Misc/StringOutputDevice.h"
+#else
+// 5.4 and 5.5 still declare FStringOutputDevice alongside FString.
+#include "Containers/UnrealString.h"
+#endif
 #include "UObject/UnrealType.h"
 
 #include "StateTree.h"

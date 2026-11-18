@@ -2284,7 +2284,12 @@ namespace MCPDialogFields
 	static void CommitText(const TSharedRef<SWidget>& Editable, const FString& Text)
 	{
 		SEditableText& Edit = static_cast<SEditableText&>(Editable.Get());
+#if UE_MCP_HAS_5_8_API
 		Edit.SetEditableText(FText::FromString(Text));
+#else
+		// 5.5.4 has no SetEditableText; the Enter below commits whatever SetText put there.
+		Edit.SetText(FText::FromString(Text));
+#endif
 		const FKeyEvent Enter(EKeys::Enter, FModifierKeysState(), 0, false, 0, 0);
 		Editable->OnKeyDown(Editable->GetTickSpaceGeometry(), Enter);
 	}

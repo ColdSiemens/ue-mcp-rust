@@ -1209,11 +1209,20 @@ namespace
 		if (!MCPLscReadHeights(Info, EditLayerGuid, true, Region, OutLayerBefore, OutError)) return false;
 
 		double Alpha = 1.0;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_6_API
 		// By reflection, as list_edit_layers reads it: the accessor moved in 5.6, the property did not.
 		if (const ULandscapeEditLayerBase* Layer = Landscape->GetEditLayerConst(EditLayerGuid))
 		{
 			if (const FNumericProperty* Prop = CastField<FNumericProperty>(Layer->GetClass()->FindPropertyByName(TEXT("HeightmapAlpha"))))
+			{
+				Alpha = Prop->GetFloatingPointPropertyValue(Prop->ContainerPtrToValuePtr<void>(Layer));
+			}
+		}
+#elif UE_MCP_HAS_5_5_API
+		// 5.5.4 has no GetEditLayerConst; the alpha is a field of the FLandscapeLayer struct.
+		if (const FLandscapeLayer* Layer = Landscape->GetLayerConst(EditLayerGuid))
+		{
+			if (const FNumericProperty* Prop = CastField<FNumericProperty>(FLandscapeLayer::StaticStruct()->FindPropertyByName(TEXT("HeightmapAlpha"))))
 			{
 				Alpha = Prop->GetFloatingPointPropertyValue(Prop->ContainerPtrToValuePtr<void>(Layer));
 			}

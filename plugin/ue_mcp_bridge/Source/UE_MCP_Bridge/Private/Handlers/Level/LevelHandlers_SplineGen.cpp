@@ -547,7 +547,7 @@ TSharedPtr<FJsonValue> FLevelSplineGenHandlers::BuildSplineMeshes(const TSharedP
 
 		const FName Name = MakeUniqueObjectName(Target.Owner, USplineMeshComponent::StaticClass(), FName(*FString::Printf(TEXT("%s_%d"), *Target.Generator, Index)));
 		USplineMeshComponent* Piece = NewObject<USplineMeshComponent>(Target.Owner, Name, RF_Transactional);
-		Piece->SetMobility(Target.Spline->GetMobility());
+		Piece->SetMobility(Target.Spline->Mobility);
 		Piece->SetupAttachment(Target.Spline);
 		Piece->ComponentTags.Add(Tag);
 		Piece->SetStaticMesh(Mesh);
@@ -717,7 +717,7 @@ TSharedPtr<FJsonValue> FLevelSplineGenHandlers::ScatterAlongSpline(const TShared
 		{
 			const FName Name = MakeUniqueObjectName(Target.Owner, UHierarchicalInstancedStaticMeshComponent::StaticClass(), FName(*FString::Printf(TEXT("%s_%d"), *Target.Generator, MeshIndex)));
 			UHierarchicalInstancedStaticMeshComponent* Instances = NewObject<UHierarchicalInstancedStaticMeshComponent>(Target.Owner, Name, RF_Transactional);
-			Instances->SetMobility(Target.Spline->GetMobility());
+			Instances->SetMobility(Target.Spline->Mobility);
 			Instances->SetupAttachment(Target.Spline);
 			Instances->ComponentTags.Add(Tag);
 			Instances->SetStaticMesh(Meshes[MeshIndex]);

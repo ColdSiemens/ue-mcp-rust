@@ -38,6 +38,18 @@
 #include "LandscapeEditLayer.h"
 #endif
 #include "Components/SplineMeshComponent.h"
+
+namespace
+{
+	// The splines component a control point or segment belongs to, or null for
+	// a deleted one, re-outered elsewhere. What 5.8's GetOuterSafe does; 5.5.4
+	// has no GetOuterSafe.
+	template <typename T>
+	ULandscapeSplinesComponent* MCPSplinesOuter(const T* Object)
+	{
+		return Object && !Object->HasAnyFlags(RF_ClassDefaultObject) ? Cast<ULandscapeSplinesComponent>(Object->GetOuter()) : nullptr;
+	}
+}
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "UObject/UnrealType.h"
@@ -139,7 +151,7 @@ namespace
 	TSharedPtr<FJsonObject> MCPLspDescribePoint(ULandscapeSplineControlPoint* Point)
 	{
 		TSharedPtr<FJsonObject> Obj = MakeShared<FJsonObject>();
-		ULandscapeSplinesComponent* Comp = Point ? Point->GetOuterSafe() : nullptr;
+		ULandscapeSplinesComponent* Comp = Point ? MCPSplinesOuter(Point) : nullptr;
 		if (!Comp) return Obj;
 		Obj->SetStringField(TEXT("name"), Point->GetName());
 		Obj->SetStringField(TEXT("path"), Point->GetPathName());
@@ -197,7 +209,7 @@ namespace
 	TSharedPtr<FJsonObject> MCPLspDescribeSegment(ULandscapeSplineSegment* Segment)
 	{
 		TSharedPtr<FJsonObject> Obj = MakeShared<FJsonObject>();
-		ULandscapeSplinesComponent* Comp = Segment ? Segment->GetOuterSafe() : nullptr;
+		ULandscapeSplinesComponent* Comp = Segment ? MCPSplinesOuter(Segment) : nullptr;
 		if (!Comp) return Obj;
 		Obj->SetStringField(TEXT("name"), Segment->GetName());
 		Obj->SetStringField(TEXT("path"), Segment->GetPathName());
@@ -352,7 +364,7 @@ namespace
 	/** A point's settable fields, in the form create and update take them. */
 	TSharedPtr<FJsonObject> MCPLspPointFieldsPayload(ULandscapeSplineControlPoint* Point)
 	{
-		ULandscapeSplinesComponent* Comp = Point->GetOuterSafe();
+		ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Point);
 		TSharedPtr<FJsonObject> Payload = MakeShared<FJsonObject>();
 		Payload->SetObjectField(TEXT("location"), MCPVec3ToJsonObject(MCPLspToWorld(Comp, Point->Location)));
 		Payload->SetObjectField(TEXT("rotation"), MCPRotatorToJsonObject(MCPLspRotToWorld(Comp, Point->Rotation)));
@@ -528,8 +540,8 @@ namespace
 			End->ConnectedSegments.Remove(FLandscapeSplineConnection(Segment, 1));
 		}
 		Comp->GetSegments().Remove(Segment);
-		if (Start && Start->GetOuterSafe()) Start->UpdateSplinePoints();
-		if (End && End != Start && End->GetOuterSafe()) End->UpdateSplinePoints();
+		if (Start && MCPSplinesOuter(Start)) Start->UpdateSplinePoints();
+		if (End && End != Start && MCPSplinesOuter(End)) End->UpdateSplinePoints();
 	}
 
 	/** Resolve the splines component a new point goes into.
@@ -803,7 +815,7 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::UpdatePoint(const TSharedPtr<FJ
 	TSharedPtr<FJsonValue> Err;
 	ULandscapeSplineControlPoint* Point = MCPLspFindPoint(World, Token, TEXT("controlPoint"), Err);
 	if (!Point) return Err;
-	ULandscapeSplinesComponent* Comp = Point->GetOuterSafe();
+	ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Point);
 
 	const TSharedPtr<FJsonObject> Before = MCPLspPointFieldsPayload(Point);
 	const FVector PreviousLocation = Point->Location;
@@ -868,7 +880,7 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::DeletePoint(const TSharedPtr<FJ
 		Result->SetStringField(TEXT("controlPoint"), Token);
 		return MCPResult(Result);
 	}
-	ULandscapeSplinesComponent* Comp = Point->GetOuterSafe();
+	ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Point);
 	const FString PointName = Point->GetName();
 	const FString PointPath = Point->GetPathName();
 	AActor* Owner = Comp->GetOwner();
@@ -892,7 +904,7 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::DeletePoint(const TSharedPtr<FJ
 		{
 			OtherEnd->Modify();
 			OtherEnd->ConnectedSegments.Remove(FLandscapeSplineConnection(Segment, 1 - Connection.End));
-			if (OtherEnd->GetOuterSafe()) OtherEnd->UpdateSplinePoints();
+			if (MCPSplinesOuter(OtherEnd)) OtherEnd->UpdateSplinePoints();
 		}
 		Comp->GetSegments().Remove(Segment);
 	}
@@ -940,11 +952,11 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::ConnectPoints(const TSharedPtr<
 	ULandscapeSplineControlPoint* End = MCPLspFindPoint(World, EndToken, TEXT("endPoint"), Err);
 	if (!End) return Err;
 	if (Start == End) return MCPError(TEXT("startPoint and endPoint are the same control point"));
-	ULandscapeSplinesComponent* Comp = Start->GetOuterSafe();
-	if (Comp != End->GetOuterSafe())
+	ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Start);
+	if (Comp != MCPSplinesOuter(End))
 	{
 		return MCPError(FString::Printf(TEXT("The two points belong to different spline owners (%s and %s); a segment can only join points in one owner"),
-			*GetNameSafe(Comp ? Comp->GetOwner() : nullptr), *GetNameSafe(End->GetOuterSafe() ? End->GetOuterSafe()->GetOwner() : nullptr)));
+			*GetNameSafe(Comp ? Comp->GetOwner() : nullptr), *GetNameSafe(MCPSplinesOuter(End) ? MCPSplinesOuter(End)->GetOwner() : nullptr)));
 	}
 
 	for (const FLandscapeSplineConnection& Connection : Start->ConnectedSegments)
@@ -1030,7 +1042,7 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::UpdateSegment(const TSharedPtr<
 	TSharedPtr<FJsonValue> Err;
 	ULandscapeSplineSegment* Segment = MCPLspFindSegment(World, Token, Err);
 	if (!Segment) return Err;
-	ULandscapeSplinesComponent* Comp = Segment->GetOuterSafe();
+	ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Segment);
 	const TSharedPtr<FJsonObject> Before = MCPLspSegmentFieldsPayload(Segment);
 
 	FScopedTransaction Transaction(NSLOCTEXT("UEMCP", "LandscapeSplineUpdateSegment", "Edit Landscape Spline Segment"));
@@ -1077,7 +1089,7 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::SetSegmentMeshes(const TSharedP
 	{
 		return MCPError(TEXT("Pass meshes, collisionProfile or castShadow; nothing to change"));
 	}
-	ULandscapeSplinesComponent* Comp = Segment->GetOuterSafe();
+	ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Segment);
 	const TSharedPtr<FJsonObject> Before = MCPLspMeshFieldsPayload(Segment);
 
 	FScopedTransaction Transaction(NSLOCTEXT("UEMCP", "LandscapeSplineSegmentMeshes", "Set Landscape Spline Segment Meshes"));
@@ -1129,7 +1141,7 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::DeleteSegment(const TSharedPtr<
 		Result->SetStringField(TEXT("segment"), Token);
 		return MCPResult(Result);
 	}
-	ULandscapeSplinesComponent* Comp = Segment->GetOuterSafe();
+	ULandscapeSplinesComponent* Comp = MCPSplinesOuter(Segment);
 	const ULandscapeSplineControlPoint* Start = Segment->Connections[0].ControlPoint;
 	const ULandscapeSplineControlPoint* End = Segment->Connections[1].ControlPoint;
 
@@ -1196,12 +1208,22 @@ TSharedPtr<FJsonValue> FLandscapeSplineHandlers::ApplySplines(const TSharedPtr<F
 	// A landscape with a reserved splines layer takes the deformation there
 	// whatever layer is passed, and regenerates it from the splines each time.
 	FString SplinesLayerName;
-#if UE_MCP_HAS_5_5_API
+#if UE_MCP_HAS_5_6_API
 	for (const ULandscapeEditLayerBase* Layer : Landscape->GetEditLayersConst())
 	{
 		if (Layer && Layer->GetClass()->GetName() == TEXT("LandscapeEditLayerSplines"))
 		{
 			SplinesLayerName = Layer->GetName().ToString();
+			break;
+		}
+	}
+#elif UE_MCP_HAS_5_5_API
+	// 5.5.4: no GetEditLayersConst; FLandscapeLayer points at the edit layer object.
+	for (const FLandscapeLayer& Layer : Landscape->GetLayers())
+	{
+		if (Layer.EditLayer && Layer.EditLayer->GetClass()->GetName() == TEXT("LandscapeEditLayerSplines"))
+		{
+			SplinesLayerName = Layer.Name.ToString();
 			break;
 		}
 	}

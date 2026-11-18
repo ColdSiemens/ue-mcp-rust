@@ -83,6 +83,7 @@ namespace
 			if (!Test.TestNotNull(TEXT("the landscape is in the disposable world"), Landscape)) return;
 			Size = 8;
 
+#if UE_MCP_HAS_5_6_API
 			const ULandscapeEditLayerBase* Base = Landscape->GetEditLayerConst(0);
 			if (!Test.TestNotNull(TEXT("the landscape has a base edit layer"), Base)) { Landscape = nullptr; return; }
 			BaseName = Base->GetName().ToString();
@@ -91,6 +92,17 @@ namespace
 			const ULandscapeEditLayerBase* Upper = UpperIndex == INDEX_NONE ? nullptr : Landscape->GetEditLayerConst(UpperIndex);
 			if (!Test.TestNotNull(TEXT("a second edit layer can be created"), Upper)) { Landscape = nullptr; return; }
 			UpperGuid = Upper->GetGuid();
+#else
+			// 5.5.4: edit layers are FLandscapeLayer structs, with the name and GUID on them.
+			const FLandscapeLayer* Base = Landscape->GetLayerConst(0);
+			if (!Test.TestNotNull(TEXT("the landscape has a base edit layer"), Base)) { Landscape = nullptr; return; }
+			BaseName = Base->Name.ToString();
+			BaseGuid = Base->Guid;
+			const int32 UpperIndex = Landscape->CreateLayer(FName(MCPTestUpperName));
+			const FLandscapeLayer* Upper = UpperIndex == INDEX_NONE ? nullptr : Landscape->GetLayerConst(UpperIndex);
+			if (!Test.TestNotNull(TEXT("a second edit layer can be created"), Upper)) { Landscape = nullptr; return; }
+			UpperGuid = Upper->Guid;
+#endif
 		}
 
 		~FMCPTargetLayerFixture()

@@ -1501,8 +1501,11 @@ namespace
 				if (R.Object1 && R.Object2) CkDiffObjects(R.Object2, R.Object1, Display, Names, Records, Hidden, Sink);
 				continue;
 			}
+#if UE_MCP_HAS_5_8_API
 			// A custom object result is a heading; the property results that name the same objects are its differences.
+			// 5.5.4 has no CUSTOM_OBJECT results.
 			if (R.Diff == EDiffType::CUSTOM_OBJECT) continue;
+#endif
 			if (!R.IsRealDifference() || !Sink.Take()) continue;
 			TSharedPtr<FJsonObject> Rec = MakeShared<FJsonObject>();
 			Rec->SetStringField(TEXT("diffType"), CkDiffTypeName(R.Diff));

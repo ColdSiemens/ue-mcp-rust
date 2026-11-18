@@ -1,5 +1,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "HandlerEngineVersion.h"
 #include "HandlerRegistry.h"
 #include "Handlers/Material/MaterialHandlers.h"
 #include "Materials/Material.h"
@@ -31,7 +32,10 @@ bool FMaterialSurgeryTest::RunTest(const FString& Parameters)
 	Material->GetExpressionCollection().AddExpression(Set);
 	Target->A.Connect(2, Source);
 	Make->BaseColor.Connect(2, Source);
+#if UE_MCP_HAS_5_8_API
+	// 5.5.4 declares ConnectInputAttribute only under ENABLE_MATERIAL_LAYER_PROTOTYPE.
 	Set->ConnectInputAttribute(MP_BaseColor, Source, 2);
+#endif
 	Material->GetExpressionInputForProperty(MP_BaseColor)->Connect(2, Source);
 	Material->GetExpressionInputForProperty(MP_MaterialAttributes)->Connect(0, Make);
 	FMCPHandlerRegistry Registry;

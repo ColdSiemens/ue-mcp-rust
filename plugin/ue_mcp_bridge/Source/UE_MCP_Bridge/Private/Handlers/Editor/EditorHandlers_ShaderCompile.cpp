@@ -18,7 +18,7 @@ TSharedPtr<FJsonValue> FEditorHandlers::GetShaderCompileStatus(const TSharedPtr<
 		for (TObjectIterator<UMaterialInterface> It; It; ++It)
 		{
 			const UMaterialInterface* Material = *It;
-			const FMaterialResource* Resource = Material->GetMaterialResource(GMaxRHIShaderPlatform);
+			const FMaterialResource* Resource = Material->GetMaterialResource(UE_MCP_MATERIAL_RESOURCE_KEY);
 			if (!Resource || PendingMaterials.Contains(Resource) || Resource->IsCompilationFinished()) continue;
 			PendingMaterials.Add(Resource);
 		}

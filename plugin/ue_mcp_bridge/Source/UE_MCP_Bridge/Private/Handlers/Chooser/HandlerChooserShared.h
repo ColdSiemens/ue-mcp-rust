@@ -19,10 +19,10 @@
 #include "UObject/UObjectIterator.h"
 #include "Algo/Reverse.h"
 #include "HandlerPropertyText.h"
-#if UE_MCP_HAS_5_5_API
+#if __has_include("Misc/StringOutputDevice.h")
 #include "Misc/StringOutputDevice.h"
 #else
-// 5.4 still declares FStringOutputDevice alongside FString.
+// 5.4 and 5.5 still declare FStringOutputDevice alongside FString.
 #include "Containers/UnrealString.h"
 #endif
 #include "Dom/JsonObject.h"

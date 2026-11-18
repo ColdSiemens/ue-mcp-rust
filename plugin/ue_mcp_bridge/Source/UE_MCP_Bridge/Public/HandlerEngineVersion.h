@@ -102,6 +102,15 @@
 #define UE_MCP_HAS_ACTOR_DESC_INSTANCE_API UE_MCP_HAS_5_5_API
 #define UE_MCP_HAS_LOADED_REGION_API UE_MCP_HAS_ACTOR_DESC_INSTANCE_API
 
+// Materials: GetMaterialResource is keyed by shader platform from 5.6 (5.8
+// keeps the feature-level overload only to return null); 5.5.4 keys it by
+// feature level.
+#if UE_MCP_HAS_5_6_API
+#define UE_MCP_MATERIAL_RESOURCE_KEY GMaxRHIShaderPlatform
+#else
+#define UE_MCP_MATERIAL_RESOURCE_KEY GMaxRHIFeatureLevel
+#endif
+
 // Animation: UPoseSearchDatabase's GetNumAnimationAssets /
 // GetDatabaseAnimationAsset pair. 5.4 exposes the clip list as the
 // AnimationAssets array of FInstancedStruct with GetAnimationAssetBase. The

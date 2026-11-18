@@ -58,7 +58,7 @@ namespace MCPStaticMeshAsset
 		{
 			OutError = FString::Printf(
 				TEXT("SetStaticMesh refused the change on %s. Its mobility is %s and its world has begun play; a Static component's mesh cannot change at runtime."),
-				*Comp->GetPathName(), *StaticEnum<EComponentMobility::Type>()->GetNameStringByValue(static_cast<int64>(Comp->GetMobility())));
+				*Comp->GetPathName(), *StaticEnum<EComponentMobility::Type>()->GetNameStringByValue(static_cast<int64>(Comp->Mobility.GetValue())));
 			return false;
 		}
 		return true;

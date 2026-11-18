@@ -549,7 +549,10 @@ TSharedPtr<FJsonValue> FSkeletalMeshHandlers::TransformSkinnedPart(const TShared
 	CommitParams.bUpdateMorphTargets = false;
 	CommitParams.bUpdateSkinWeightProfiles = false;
 	CommitParams.bUpdateVertexAttributes = false;
+#if UE_MCP_HAS_5_8_API
+	// Not a commit option in 5.5.4.
 	CommitParams.bUpdateVertexColors = false;
+#endif
 #endif
 	CommitParams.bForceUpdate = true;
 
