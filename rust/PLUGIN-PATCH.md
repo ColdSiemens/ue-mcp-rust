@@ -1,6 +1,6 @@
 # UE_MCP_Bridge changes in this fork
 
-This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b69048614ede6dad55fd` (plugin 1.4.12-beta.1) plus five changes:
+This fork's `plugin/ue_mcp_bridge` is upstream commit `dabe023c` (ue-mcp 1.4.14-beta.7) plus five changes:
 1. Concurrent requests per socket.
 2. No background throttling while a client is connected.
 3. Builds on UE 5.5.4.
@@ -8,18 +8,18 @@ This fork's `plugin/ue_mcp_bridge` is upstream commit `cfa15afb810e3be1c3f9b6904
 5. Writes are checked against the editor's lock registry.
 
 Status:
-- Compiled on UE 5.8.2 and UE 5.5.4. `rust/tools/check-engine-compat.ps1` repeats the check.
+- Compiled on UE 5.8 and UE 5.5.4. `rust/tools/check-engine-compat.ps1` repeats the check.
 - Live-tested on UE 5.8.2 and 5.5.4: start, reads, one-socket concurrency, parallel reads, stop, and Blueprint layout with undo all passed. The editor log shows throttling suspended.
 
 ## What changes
 
 **1. One socket runs many requests at once** (`BridgeServer.cpp` / `.h`)
 
-- Before: the connection's reader called `ProcessMessage` inline and read nothing more until the game thread answered. A client that sends several agents' calls down one socket queued them all behind the slowest one.
-- After: each complete message gets its own worker thread (`Async(EAsyncExecution::Thread)`, not the thread pool, because workers block for the whole game-thread wait). The worker runs `ProcessMessage` and writes its own answer.
-- Every write to the socket goes through one per-connection send lock (`FMCPConnectionChannel`), so frames never interleave. Nothing is sent after a close frame.
+- Before: the connection's reader called `ProcessMessage` inline and read nothing more until the game thread answered (upstream only moves a deferred answer off the reader). A client that sends several agents' calls down one socket queued them all behind the slowest one.
+- After: each complete message gets its own worker thread (`Async(EAsyncExecution::Thread)`, not the thread pool, because workers block for the whole game-thread wait). The worker runs `ProcessMessage`, waits out a deferred answer, and writes its own answer.
+- Every write goes through upstream's per-connection `FMCPConnectionWriter`, under one lock, so frames never interleave. Nothing is written once the connection has retired it.
 - At most 32 requests can be in flight per connection. At the cap the reader stops reading, so TCP pushes back on the client.
-- Before the reader returns and the socket closes, it waits for every worker, on every exit path. On shutdown the executor's existing `BeginShutdown` makes those waits end within one 50 ms slice.
+- Workers are counted like connections, so shutdown waits for them; the executor's `BeginShutdown` makes their game-thread waits end within one 50 ms slice.
 - `get_bridge_capabilities` adds `"concurrent-dispatch"` to `features` while this mode is on.
 - Unchanged: handlers still run one at a time on the game thread. Concurrent requests just queue for the same tick instead of queueing behind each other first. `ProcessMessage` was already re-entrant, because separate connections always ran it in parallel.
 - New benefit: while one request waits on a modal dialog, `respond_to_dialog` can arrive on the same socket.
@@ -40,6 +40,7 @@ Upstream says it supports 5.4–5.8, but 153 distinct compile errors and 5 link 
 - Where 5.5 has an equivalent, a 5.5 branch uses it. Examples: MetaSound builder lookups through the frontend document builder; landscape edit layers through `GetLayers()`; StateTree `SetLinkedState` done step by step.
 - Classes that 5.5 declares without an export macro are resolved by reflection path, e.g. `/Script/Engine.WorldPartitionRuntimeCellTransformer`.
 - The 5.8 code path is upstream's code, unchanged.
+- Upstream's 1.4.14 code added 39 more errors on 5.5.4, fixed the same way. Examples: landscape splines and edit layers, `GetMaterialResource` (keyed by feature level before 5.6), component mobility, and the moved `FStringOutputDevice` header.
 
 What is missing below UE 5.8 (verified absent in 5.5.4; may exist in 5.6/5.7):
 
@@ -51,7 +52,9 @@ What is missing below UE 5.8 (verified absent in 5.5.4; may exist in 5.6/5.7):
 | `request_state_tree_transition` with `fallback` | Returns "requires UE 5.8". The transition itself works. |
 | `epic_*` actions | Need UE 5.8's toolset registry; the Rust server hides them on older editors. |
 | Output fields | Omitted where 5.5 has no data: StateTree schema flags and `tasksCompletion`, `description` (needs 5.6), `numExternalObjects`, plugin `mounted`, trace bytes emitted. Relay trace states read "unknown"; sound concurrency reports the authored `MaxCount`. |
-| Widget variable GUIDs | Not synced, because 5.5 widget blueprints have no GUID map. |
+| Widget variable GUIDs | Not synced, because 5.5 widget blueprints have no GUID map; a widget rename doesn't move one either. |
+| Dialog text entry | Typing into a dialog's text field sets the text, then presses Enter (5.5 has no `SetEditableText`). |
+| Checkpoint diffs | No "custom object" headings; 5.5 doesn't produce them. |
 
 **4. `set_node_positions`** (`BlueprintHandlers_Graph.cpp`)
 

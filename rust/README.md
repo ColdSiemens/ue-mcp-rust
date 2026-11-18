@@ -29,7 +29,7 @@ Example subagent brief:
 | `--http ADDR` | stdio | Serve Streamable HTTP, e.g. `127.0.0.1:7878`. |
 | `--connections N` | 4 | Sockets to the editor. With a stock plugin, N = calls in flight. |
 | `--compact` | off | Action names only in descriptions; `project(describe_action)` gives the details. |
-| `--no-epic` | off | Hide the 830 `epic_*` wrappers of Unreal 5.8's own toolsets. |
+| `--no-epic` | off | Hide the `epic_*` wrappers of Unreal's own toolsets (830 on UE 5.8, about 1,900 on 5.9). |
 | `--tools a,b` | all | Only these categories (`project` is always included). |
 | `--bridge-port P` / `UE_MCP_PORT` | auto | Skip port discovery. |
 | `--engine-root DIR` / `UE_ENGINE_ROOT` | auto | Engine folder for `start_editor` and builds. Default: the `.uproject`'s EngineAssociation (launcher version, registered source build, or path). `UE_EDITOR_PATH` names the editor exe directly. |
@@ -40,18 +40,21 @@ Example subagent brief:
 
 HTTP query parameters per session: `agent`, `tools`, `compact=1`, `epic=0`. `GET /health` returns the server's status: sockets, in-flight calls, sessions and locks.
 
-Tool-list size, as measured:
+Tool-list size for a UE 5.8 project, as measured. A 5.5 project gets no `epic_*` actions, so it is the `--no-epic` size anyway:
 
 | View | Size | ~Tokens |
 |---|---|---|
-| full | 197 KB | 50k |
-| `--compact` | 60 KB | 15k |
-| `--compact --no-epic` | 40 KB | 10k |
-| `--compact --no-epic --tools level,blueprint,material` | 8 KB | 2k |
+| full | 227 KB | 58k |
+| `--compact` | 67 KB | 17k |
+| `--compact --no-epic` | 45 KB | 12k |
+| `--compact --no-epic --tools level,blueprint,material` | 9 KB | 2k |
+
+The engine comes from the connected editor, or before it starts, from the engine the `.uproject` resolves to. When neither is known, every Epic tool is listed (351 KB full).
 
 ## What was ported
 
-- **All bridge actions (2,053)** are forwarded unchanged, including the `epic_*` envelope (asset refs expand, `input`/`inputJson`).
+- **All bridge actions (1,428)** are forwarded unchanged, plus the `epic_*` envelope (asset refs expand, `input`/`inputJson`). An Epic tool that Unreal renamed between engines (5.8 to 5.9) is sent under the running engine's name, with its parameters renamed to match.
+- **The session token** the plugin requires on every connection is read from `~/.ue-mcp/bridge/<port>.token` (or `UE_MCP_BRIDGE_TOKEN_DIR`) on each connect.
 - **Server-side actions:**
   - `asset`: `lock`, `unlock`, `unlock_all`, `search`, `migrate`
   - `blueprint(author)`, `niagara(batch)`, `pcg(wait_for_generation)` (and `wait:true` on `pcg(execute/force_regenerate)`)
@@ -135,7 +138,7 @@ cd rust
 python tools/extract_surface.py .. surface/surface.json
 ```
 
-Current surface: upstream commit `cfa15afb` (1.4.12-beta.1).
+Current surface: upstream commit `dabe023c` (1.4.14-beta.7). Not ported: upstream's Node-only features, such as checkpoints and the edit journal, graph diagrams, the C++ symbol index, `editor(batch)`, flows and inline images.
 
 ## License
 

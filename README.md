@@ -8,7 +8,7 @@ Control the Unreal Engine editor from AI agents, **several of them at once**. A 
   - it stops the editor throttling itself while agents drive it from the background;
   - it builds on **UE 5.5 through 5.8**.
 
-The same ~2,000 editor actions as upstream: Blueprints, UMG, levels, materials, animation, Niagara, PCG, landscape, audio, StateTree, GAS and more.
+The same editor actions as upstream (ue-mcp 1.4.14): about 1,400 of its own, covering Blueprints, UMG, levels, materials, animation, Niagara, PCG, landscape, audio, StateTree, GAS and more, plus Epic's own toolsets on UE 5.8 and later.
 
 ## Why this fork
 
@@ -103,15 +103,16 @@ All options, the per-session filters and the full list of what was ported are in
 |---|---|
 | 5.8 | Compiled and live-tested (5.8.2) |
 | 5.5 | Compiled and live-tested (5.5.4) |
-| 5.6, 5.7 | Expected to work, not tested here |
+| 5.6, 5.7, 5.9 | Expected to work, not tested here |
 
-Below 5.8, a few actions and options return "requires UE 5.8" instead of failing; the list is in [PLUGIN-PATCH.md](rust/PLUGIN-PATCH.md). The server reads the editor's engine version and hides what that editor can't run, including the `epic_*` toolset actions, which need 5.8. After merging upstream changes, `rust\tools\check-engine-compat.ps1` recompiles the plugin against every installed engine.
+Below 5.8, a few actions and options return "requires UE 5.8" instead of failing; the list is in [PLUGIN-PATCH.md](rust/PLUGIN-PATCH.md). The server reads the editor's engine version, or before the editor starts, the version of the engine the project uses. It hides what that engine can't run: every `epic_*` toolset action below 5.8, and on 5.8 the Epic tools that exist only in 5.9. After merging upstream changes, `rust\tools\check-engine-compat.ps1` recompiles the plugin against every installed engine.
 
 ## Troubleshooting
 
 - **The editor isn't found or connected.** `project(action="get_status")` lists the ports tried. The editor publishes its port in `<Project>/Saved/UE_MCP_Bridge/port.json`; `--bridge-port` overrides it.
 - **Antivirus and HTTP mode.** Some antivirus web shields, Avast among them, proxy localhost HTTP and corrupt responses, even with the project folder excluded. Use stdio, or exclude `127.0.0.1` in the web shield.
-- **Plugin build errors after updating.** Run `rust\tools\check-engine-compat.ps1` and see [PLUGIN-PATCH.md](rust/PLUGIN-PATCH.md).
+- **Plugin build errors after updating.** Run `rust\tools\check-engine-compat.ps1` and see [PLUGIN-PATCH.md](rust/PLUGIN-PATCH.md). If the build stalls on "memory pressure", add `-MaxParallel 4`.
+- **"The editor refused the session token".** The plugin writes a token to `~/.ue-mcp/bridge/<port>.token` each time the editor starts, and requires it on every connection. Run the server as the same Windows user as the editor; if the editor has `UE_MCP_BRIDGE_TOKEN_DIR` set, set it for the server too.
 - **`stop_editor` seems slow.** The editor is showing its own "Save Content" prompt. It never discards work; answer the prompt or save first.
 
 ## Repository layout
