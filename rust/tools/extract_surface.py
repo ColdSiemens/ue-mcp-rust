@@ -82,18 +82,40 @@ def string_value(expr):
     return json.loads('"' + m.group(1) + '"') if m else None
 
 
-BP_CALL = re.compile(r"(?:^|[\s,{(])(?P<key>[A-Za-z_]\w*)\s*:\s*(?P<fn>\w*[sS]pecBp|bp)\s*\(", re.M)
+# key: bp(...), or wrapped once: key: withInlineImage(specBp(...), [...]). A wrapper
+# adds Node-side behaviour (an inline image, a diff window) around the same bridge call.
+BP_CALL = re.compile(r"(?:^|[\s,{(])(?P<key>[A-Za-z_]\w*)\s*:\s*(?:[A-Za-z_]\w*\(\s*)?(?P<fn>\w*[sS]pecBp|bp)\s*\(", re.M)
+# The epicTool literal is one line: { toolset, name, engines?, successors?: [{ toolset,
+# name, engines, schema?, rename? }] }. A successor is the same tool under another
+# engine's name and parameter spelling.
 EPIC_ENTRY = re.compile(
     r"^\s{2}(?P<key>epic_\w+):\s*\{\s*epicSchema:\s*(?P<schema>S_\w+),\s*"
-    r"epicTool:\s*\{\s*toolset:\s*\"(?P<toolset>[^\"]+)\",\s*name:\s*\"(?P<name>[^\"]+)\"\s*\},\s*"
-    r"\.\.\.bp\(\s*\"(?P<effect>\w+)\",\s*\"(?P<desc>(?:[^\"\\]|\\.)*)\"",
+    r"epicTool:\s*(?P<tool>\{.*\}),[ \t]*\n"
+    r"\s*\.\.\.bp\(\s*\"(?P<effect>\w+)\",\s*\"(?P<desc>(?:[^\"\\]|\\.)*)\"",
     re.M,
 )
 SCHEMA_CONST = re.compile(r"^const (S_\w+) = (\{.*\}) as const;$", re.M)
+JS_KEY = re.compile(r"([{,]\s*)([A-Za-z_]\w*)\s*:")
+SCHEMA_REF = re.compile(r'"schema":\s*(S_\w+)')
 
 
-OBJ_ENTRY = re.compile(r"(?:^|[\s,{(])(?P<key>[A-Za-z_]\w*)\s*:\s*\{", re.M)
-SPREAD_BP = re.compile(r"^\s*\.\.\.(?P<fn>\w*[sS]pecBp|bp)\s*\(")
+def epic_tool_literal(text, schemas):
+    """The epicTool object literal as data, with its successors' schemas resolved."""
+    tool = json.loads(SCHEMA_REF.sub(r'"schema": "\1"', JS_KEY.sub(r'\1"\2":', text)))
+    successors = []
+    for v in tool.get("successors", []):
+        out = {"toolset": v["toolset"], "tool": v["name"], "engines": v.get("engines", [])}
+        if "schema" in v:
+            out["schema"] = schemas.get(v["schema"], {})
+        if v.get("rename"):
+            out["rename"] = v["rename"]
+        successors.append(out)
+    return tool, successors
+
+
+OBJ_ENTRY = re.compile(r"(?:^|[\s,{(])(?P<key>[A-Za-z_]\w*)\s*:\s*(?:[A-Za-z_]\w*\(\s*)?\{", re.M)
+# The spread may follow other fields: { bridgeEffect: ..., ...specBp(...) }.
+SPREAD_BP = re.compile(r"(?:^|[\s,{])\.\.\.(?P<fn>\w*[sS]pecBp|bp)\s*\(")
 TIMEOUT = re.compile(r"(?:^|[\s,{])timeoutMs\s*:\s*([\d_]+)")
 
 
@@ -129,7 +151,7 @@ def scan_file(path):
         _, close = call_args(src, m.end() - 1)
         body = src[m.end():close]
         top = body.lstrip()
-        sm = SPREAD_BP.match(body)
+        sm = SPREAD_BP.search(body)
         if sm:
             spec = parse_bp(src, m.end() + sm.end() - 1, sm.group("fn"))
             if not spec:
@@ -150,15 +172,21 @@ def scan_epic(path):
     schemas = {m.group(1): json.loads(m.group(2)) for m in SCHEMA_CONST.finditer(src)}
     found = {}
     for m in EPIC_ENTRY.finditer(src):
-        found[m.group("key")] = {
+        tool, successors = epic_tool_literal(m.group("tool"), schemas)
+        spec = {
             "kind": "epic",
             "bridge": "epic_call_tool",
             "effect": m.group("effect"),
             "summary": json.loads('"' + m.group("desc") + '"'),
-            "toolset": m.group("toolset"),
-            "tool": m.group("name"),
+            "toolset": tool["toolset"],
+            "tool": tool["name"],
             "schema": schemas.get(m.group("schema"), {}),
         }
+        if tool.get("engines"):
+            spec["engines"] = tool["engines"]
+        if successors:
+            spec["successors"] = successors
+        found[m.group("key")] = spec
     return found
 
 

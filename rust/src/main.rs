@@ -121,6 +121,7 @@ async fn main() -> anyhow::Result<()> {
         hide_epic: cli.no_epic,
         compact: cli.compact,
         registered: None,
+        engine: None,
     };
 
     match cli.http {

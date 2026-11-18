@@ -34,6 +34,13 @@ impl Engine {
     pub fn build_script(&self) -> PathBuf {
         self.root.join(BUILD_REL)
     }
+
+    /// "5.8", from the engine's Build.version.
+    pub fn version(&self) -> Option<String> {
+        let text = std::fs::read_to_string(self.root.join("Engine/Build/Build.version")).ok()?;
+        let v: Value = serde_json::from_str(&text).ok()?;
+        Some(format!("{}.{}", v["MajorVersion"].as_u64()?, v["MinorVersion"].as_u64()?))
+    }
 }
 
 #[cfg(windows)]

@@ -88,8 +88,46 @@ pub enum Effect {
 #[derive(Debug, Clone)]
 pub enum Dispatch {
     Bridge { method: String },
-    Epic { toolset: String, tool: String, schema: Value },
+    /// One Epic tool, named and shaped differently per engine version: the
+    /// first variant is the base, later ones its successors.
+    Epic { variants: Vec<EpicTool> },
     Local,
+}
+
+#[derive(Debug, Clone)]
+pub struct EpicTool {
+    pub toolset: String,
+    pub tool: String,
+    pub schema: Value,
+    /// Engine versions ("5.8") that have this variant; empty = every engine.
+    pub engines: Vec<String>,
+    /// Parameter names this variant spells differently from the base: base -> this.
+    pub rename: Map<String, Value>,
+}
+
+impl EpicTool {
+    fn from_spec(spec: &Value, schema: Value) -> EpicTool {
+        EpicTool {
+            toolset: spec["toolset"].as_str().unwrap_or_default().to_string(),
+            tool: spec["tool"].as_str().or_else(|| spec["name"].as_str()).unwrap_or_default().to_string(),
+            schema,
+            engines: spec["engines"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect(),
+            rename: spec["rename"].as_object().cloned().unwrap_or_default(),
+        }
+    }
+
+    pub fn runs_on(&self, engine: &str) -> bool {
+        self.engines.is_empty() || self.engines.iter().any(|e| e == engine)
+    }
+}
+
+/// The variant for an editor of `engine` ("5.8"), or the base when the engine
+/// is not known yet. None when no variant exists on that engine.
+pub fn epic_variant<'a>(variants: &'a [EpicTool], engine: Option<&str>) -> Option<&'a EpicTool> {
+    match engine {
+        Some(e) => variants.iter().find(|v| v.runs_on(e)),
+        None => variants.first(),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -153,6 +191,8 @@ pub struct View {
     pub compact: bool,
     /// Hide bridge actions the running plugin does not register.
     pub registered: Option<std::sync::Arc<HashSet<String>>>,
+    /// The running editor's engine, "5.8": hides Epic tools it doesn't have.
+    pub engine: Option<String>,
 }
 
 impl View {
@@ -167,6 +207,11 @@ impl View {
     pub fn allows_action(&self, action: &Action) -> bool {
         if self.hide_epic && action.is_epic() {
             return false;
+        }
+        if let (Some(engine), Dispatch::Epic { variants }) = (&self.engine, &action.dispatch) {
+            if epic_variant(variants, Some(engine)).is_none() {
+                return false;
+            }
         }
         match (&self.registered, &action.dispatch) {
             (Some(reg), Dispatch::Bridge { method }) => reg.contains(method) || ALWAYS_SERVED.contains(&method.as_str()),
@@ -205,9 +250,13 @@ impl Surface {
                 let dispatch = match kind {
                     "bridge" => Dispatch::Bridge { method: spec["bridge"].as_str().unwrap_or_default().to_string() },
                     "epic" => Dispatch::Epic {
-                        toolset: spec["toolset"].as_str().unwrap_or_default().to_string(),
-                        tool: spec["tool"].as_str().unwrap_or_default().to_string(),
-                        schema: spec["schema"].clone(),
+                        variants: std::iter::once(EpicTool::from_spec(spec, spec["schema"].clone()))
+                            .chain(spec["successors"].as_array().into_iter().flatten().map(|s| {
+                                // A successor without a schema of its own takes the base's.
+                                let schema = if s["schema"].is_object() { s["schema"].clone() } else { spec["schema"].clone() };
+                                EpicTool::from_spec(s, schema)
+                            }))
+                            .collect(),
                     },
                     _ if local.contains(&(name.as_str(), aname.as_str())) => Dispatch::Local,
                     _ => continue,
@@ -368,10 +417,13 @@ impl Surface {
                     }
                 }
             }
-            Dispatch::Epic { tool: epic_tool, schema, .. } => {
+            Dispatch::Epic { variants } => {
                 out["bridgeMethod"] = json!("epic_call_tool");
-                out["epicTool"] = json!(epic_tool);
-                out["inputSchema"] = schema.clone();
+                if let Some(base) = variants.first() {
+                    out["epicTool"] = json!(base.tool);
+                    out["inputSchema"] = base.schema.clone();
+                }
+                out["engines"] = json!(variants.iter().map(|v| json!({ "engines": v.engines, "epicTool": v.tool })).collect::<Vec<_>>());
                 out["note"] = json!("Pass the tool's arguments flat in args, or whole as args.input; asset references accept a plain path.");
             }
             Dispatch::Local => {
@@ -507,6 +559,27 @@ mod tests {
         let mut names: Vec<String> = s.list(&view).iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
         names.sort();
         assert_eq!(names, vec!["level", "project"]);
+    }
+
+    #[test]
+    fn epic_tools_run_as_the_running_engines_variant() {
+        let s = Surface::load();
+        let add = s.tool("material").and_then(|t| t.action("epic_add_expression")).unwrap();
+        let Dispatch::Epic { variants } = &add.dispatch else { panic!("not an epic action") };
+        assert_eq!(epic_variant(variants, Some("5.8")).unwrap().tool, "editor_toolset.toolsets.material.MaterialTools.add_expression");
+        let on_59 = epic_variant(variants, Some("5.9")).unwrap();
+        assert_eq!(on_59.tool, "EditorToolset.MaterialToolset.AddExpression");
+        assert_eq!(on_59.rename["material_or_function"], "materialOrFunction");
+        assert!(epic_variant(variants, Some("5.5")).is_none());
+
+        // A tool one engine lacks is hidden from that engine's editor.
+        let shown = |action: &str, engine: &str| {
+            let a = s.tool("animation").and_then(|t| t.action(action)).unwrap();
+            View { engine: Some(engine.into()), ..Default::default() }.allows_action(a)
+        };
+        assert!(shown("epic_add_actors", "5.8") && !shown("epic_add_actors", "5.9"));
+        let only_59 = "epic_add_actors__level_sequence_editor_subsystem";
+        assert!(!shown(only_59, "5.8") && shown(only_59, "5.9"));
     }
 
     #[test]

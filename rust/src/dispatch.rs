@@ -2,17 +2,18 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Map, Value};
 
 use crate::bridge::{Bridge, BridgeError};
 use crate::config::Project;
+use crate::editor;
 use crate::epic;
 use crate::locks::{self, LockTable};
 use crate::project_files;
-use crate::surface::{Action, Dispatch, Effect, Surface, Tool, View};
+use crate::surface::{self, Action, Dispatch, Effect, EpicTool, Surface, Tool, View};
 
 /// What the plugin waits for a handler that registered no timeout of its own.
 const DEFAULT_HANDLER_TIMEOUT_MS: u64 = 30_000;
@@ -60,6 +61,8 @@ pub struct Hub {
     /// (lock owner, asset) -> graphs that owner added nodes to since its last
     /// auto_layout, in the order it touched them.
     touched: Mutex<HashMap<(String, String), Vec<String>>>,
+    /// The engine the .uproject resolves to, for the surface before an editor connects.
+    project_engine: OnceLock<Option<String>>,
     started: Instant,
     calls: AtomicU64,
 }
@@ -142,6 +145,7 @@ impl Hub {
             project,
             sessions: Mutex::new(HashMap::new()),
             touched: Mutex::new(HashMap::new()),
+            project_engine: OnceLock::new(),
             started: Instant::now(),
             calls: AtomicU64::new(0),
         }
@@ -169,11 +173,12 @@ impl Hub {
         view.hide_epic |= self.opts.hide_epic;
         if self.opts.hide_unregistered {
             view.registered = self.bridge.registered_methods();
-            // The plugin registers epic_call_tool on every engine, but the
-            // toolset registry it calls into is UE 5.8+.
-            if self.bridge.engine_version().as_deref().and_then(engine_minor).is_some_and(|v| v < (5, 8)) {
-                view.hide_epic = true;
-            }
+        }
+        view.engine = self.running_engine();
+        // The plugin registers epic_call_tool on every engine, but the
+        // toolset registry it calls into is UE 5.8+.
+        if view.engine.as_deref().and_then(engine_minor).is_some_and(|v| v < (5, 8)) {
+            view.hide_epic = true;
         }
         view
     }
@@ -256,7 +261,7 @@ impl Hub {
 
         let outcome = match &action.dispatch {
             Dispatch::Bridge { method } => self.bridge_call_checked(method, Value::Object(params), routing.timeout_ms.or(action.timeout_ms), lock_check).await,
-            Dispatch::Epic { toolset, tool: epic_tool, schema } => match epic::build_call(toolset, epic_tool, schema, &params) {
+            Dispatch::Epic { variants } => match self.epic_envelope(variants, &params) {
                 Ok(envelope) => self.bridge_call_checked("epic_call_tool", envelope, routing.timeout_ms.or(action.timeout_ms), lock_check).await,
                 Err(msg) => Err(msg),
             },
@@ -282,6 +287,39 @@ impl Hub {
             }
             Err(msg) => ToolResult::error(msg),
         }
+    }
+
+    /// The epic_call_tool request for the variant the running editor has.
+    fn epic_envelope(&self, variants: &[EpicTool], params: &Map<String, Value>) -> Result<Value, String> {
+        let engine = self.running_engine();
+        let variant = surface::epic_variant(variants, engine.as_deref()).ok_or("this Epic tool does not exist in the running editor's engine")?;
+        if variant.rename.is_empty() {
+            return epic::build_call(&variant.toolset, &variant.tool, &variant.schema, params);
+        }
+        let renamed = params
+            .iter()
+            .map(|(k, v)| (variant.rename.get(k).and_then(Value::as_str).unwrap_or(k).to_string(), v.clone()))
+            .collect();
+        epic::build_call(&variant.toolset, &variant.tool, &variant.schema, &renamed)
+    }
+
+    /// "5.8": the connected editor's engine, else the one the project is set
+    /// to use, so a session that lists tools before the editor starts already
+    /// gets the right ones.
+    fn running_engine(&self) -> Option<String> {
+        self.bridge
+            .engine_version()
+            .as_deref()
+            .and_then(engine_minor)
+            .map(|(major, minor)| format!("{major}.{minor}"))
+            .or_else(|| {
+                self.project_engine
+                    .get_or_init(|| {
+                        let project = self.project.as_ref()?;
+                        editor::resolve_engine(project, self.opts.engine_root.as_deref()).ok()?.version()
+                    })
+                    .clone()
+            })
     }
 
     fn unavailable_message(&self, tool: &Tool, action: &Action) -> String {
@@ -426,7 +464,7 @@ impl Hub {
                         let (t, a) = hits[0];
                         let mut out = self.surface.describe(t, a);
                         if self.bridge.registered_methods().is_some() {
-                            let reg = View { registered: self.bridge.registered_methods(), ..View::default() };
+                            let reg = View { registered: self.bridge.registered_methods(), engine: self.running_engine(), ..View::default() };
                             out["availableInRunningEditor"] = json!(reg.allows_action(a));
                             out["engineVersion"] = json!(self.bridge.engine_version());
                         }
@@ -608,7 +646,7 @@ impl Hub {
             let params = op.get("params").or_else(|| op.get("args")).and_then(Value::as_object).cloned().unwrap_or_default();
             let answer = match &action.dispatch {
                 Dispatch::Bridge { method } => self.bridge_call(method, Value::Object(params), action.timeout_ms).await,
-                Dispatch::Epic { toolset, tool: t, schema } => match epic::build_call(toolset, t, schema, &params) {
+                Dispatch::Epic { variants } => match self.epic_envelope(variants, &params) {
                     Ok(env) => self.bridge_call("epic_call_tool", env, action.timeout_ms).await,
                     Err(e) => Err(e),
                 },
