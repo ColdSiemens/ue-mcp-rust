@@ -19,6 +19,8 @@ When tool descriptions list only action names (the server's compact mode), get o
 
 If the editor isn't connected, call `editor(action="start_editor")`: it launches the project's editor and returns once the editor reports ready (the first launch can take minutes while shaders compile). Handlers that need the editor world return `"Editor is still initializing. Please wait and retry."` if called too early.
 
+If the ue-mcp tools are missing altogether, or the editor stays disconnected while it is open, follow `Plugins/UE_MCP_Bridge/Server/README.md` in the project. The server ships in that folder with the plugin it must match; don't install or point `.mcp.json` at another copy.
+
 ## Working alongside other agents
 
 Several agents can drive one editor at the same time. To keep out of each other's way:

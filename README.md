@@ -43,42 +43,42 @@ Unreal still runs editor operations on its single game thread; what's gone is ag
 git clone -b rust-hub https://github.com/ColdSiemens/ue-mcp-rust.git
 ```
 
-**2. Install the plugin into your game.** Any `UE_MCP_Bridge` already there, stock or patched by hand, is moved to `Saved\` as a backup:
-
-```powershell
-.\rust\install-plugin.ps1 -Project D:\Games\MyGame\MyGame.uproject
-```
-
-It also copies the six `ue-mcp-*` agent skills (workflow, Blueprint, native C++, Epic routing, Niagara, animation) into the game's `.claude\skills\`. It replaces only those six folders, backs the old copies up to `Saved\`, and leaves your other skills alone. Pass `-SkipSkills` to install the plugin only.
-
-Then compile it for your engine:
-- **C++ project:** build the Editor target.
-- **Blueprint-only project:** open the project and accept the rebuild prompt.
-
-**3. Get the server.**
-- **Prebuilt** (no Rust needed), once a `rust-v*` release is on the Releases page. This downloads it to `%LOCALAPPDATA%\ue-mcp-rs` and registers it with Claude Code for that project:
-  ```powershell
-  .\rust\install.ps1 -Project D:\Games\MyGame\MyGame.uproject
-  ```
+**2. Get the server.**
 - **From source:** gives `rust\target\release\ue-mcp-rs.exe`.
   ```bash
   cd rust
   cargo build --release
   ```
+- **Prebuilt** (no Rust needed), once a `rust-v*` release is on the Releases page: take `ue-mcp-rs.exe` from its zip.
 
-**4. Register it with Claude Code** (step 3's `install.ps1` already did this). Use stdio:
+**3. Install the plugin and the server into your game.** Any `UE_MCP_Bridge` already there, stock or patched by hand, is moved to `Saved\` as a backup:
+
+```powershell
+.\rust\install-plugin.ps1 -Project D:\Games\MyGame\MyGame.uproject   # add -ServerExe <path> for a prebuilt exe
+```
+
+It does three things:
+- **Plugin:** copies it to `Plugins\UE_MCP_Bridge`.
+- **Server:** puts `ue-mcp-rs.exe` and its launcher, `ue-mcp.cmd`, in `Plugins\UE_MCP_Bridge\Server\`, and points the game's `.mcp.json` at the launcher. It keeps the other servers in that file and backs the old file up to `Saved\`.
+- **Skills:** copies the six `ue-mcp-*` agent skills (workflow, Blueprint, native C++, Epic routing, Niagara, animation) into the game's `.claude\skills\`. It replaces only those six folders, backs the old copies up to `Saved\`, and leaves your other skills alone. Pass `-SkipSkills` to skip them.
+
+The resulting `.mcp.json` has no per-machine paths:
+
+```json
+{ "mcpServers": { "ue-mcp": { "command": "cmd", "args": ["/d", "/c", "Plugins\\UE_MCP_Bridge\\Server\\ue-mcp.cmd", "--compact"] } } }
+```
+
+**For a team,** submit `Plugins\UE_MCP_Bridge` (with `Server\`) and `.mcp.json` in one change. Everyone then gets the server with a normal sync, always the build that matches the plugin; the plugin refuses an older server. The launcher runs a copy under `%LOCALAPPDATA%\ue-mcp-rs\<hash>\`, so a sync can replace the exe while sessions run. `Server\README.md` tells agents what to check when the tools don't connect. Remove any old Node `ue-mcp` entry so agents don't see every tool twice.
+
+**Just for you,** without touching the project's `.mcp.json`: pass `-SkipServer`, then `.\rust\install.ps1 -Project ...` downloads a release to `%LOCALAPPDATA%\ue-mcp-rs` and registers it, or register a build yourself:
 
 ```powershell
 claude mcp add ue -- "$env:LOCALAPPDATA\ue-mcp-rs\ue-mcp-rs.exe" "D:\Games\MyGame\MyGame.uproject" --compact
 ```
 
-For a team, commit a `.mcp.json` at the game's root, so everyone who installed the server gets it with no per-machine paths. The server finds the `.uproject` in its working folder:
-
-```json
-{ "mcpServers": { "ue": { "command": "${LOCALAPPDATA}/ue-mcp-rs/ue-mcp-rs.exe", "args": ["--compact"] } } }
-```
-
-Remove any old Node `ue-mcp` entry so agents don't see every tool twice.
+**4. Compile the plugin** for your engine:
+- **C++ project:** build the Editor target.
+- **Blueprint-only project:** open the project and accept the rebuild prompt.
 
 **5. Check it.** Ask the agent to run `project(action="get_status")`. It reports the editor's engine version, `concurrentDispatch: true`, and the open connections. `editor(action="start_editor")` launches the editor if it isn't running.
 

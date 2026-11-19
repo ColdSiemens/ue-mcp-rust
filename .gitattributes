@@ -97,3 +97,7 @@ tests/golden/daemon-api.d.ts.txt text eol=lf
 *.dae binary
 *.3ds binary
 *.blend binary
+
+# cmd needs CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
