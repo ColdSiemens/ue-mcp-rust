@@ -213,8 +213,14 @@ impl Hub {
         };
         // A new session's first call can arrive before its sockets are up; the
         // guard below needs the plugin's handshake, so give it a moment.
-        if !matches!(action.dispatch, Dispatch::Local) && !self.bridge.is_connected() {
-            self.bridge.wait_connected(Duration::from_secs(2)).await;
+        // A local action such as get_status reports on the editor, so it waits
+        // for the first attempt only.
+        if !self.bridge.is_connected() {
+            if matches!(action.dispatch, Dispatch::Local) {
+                self.bridge.wait_first_attempt(Duration::from_secs(2)).await;
+            } else {
+                self.bridge.wait_connected(Duration::from_secs(2)).await;
+            }
         }
         let view = self.effective_view(session);
         // Guard: never send an editor a method its plugin build does not have.

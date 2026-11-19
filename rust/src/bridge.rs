@@ -95,6 +95,8 @@ pub struct Bridge {
     next_id: AtomicU64,
     rotate: AtomicUsize,
     connected: AtomicUsize,
+    /// Sockets whose first connect attempt has finished, whatever its outcome.
+    tried: AtomicUsize,
     /// Woken on every connect, disconnect and answer.
     changed: Notify,
     caps: Mutex<Capabilities>,
@@ -121,6 +123,7 @@ impl Bridge {
             next_id: AtomicU64::new(1),
             rotate: AtomicUsize::new(0),
             connected: AtomicUsize::new(0),
+            tried: AtomicUsize::new(0),
             changed: Notify::new(),
             caps: Mutex::new(Capabilities::default()),
             resolver,
@@ -161,6 +164,22 @@ impl Bridge {
             let notified = self.changed.notified();
             if self.is_connected() {
                 return true;
+            }
+            if tokio::time::timeout_at(deadline, notified).await.is_err() {
+                return self.is_connected();
+            }
+        }
+    }
+
+    /// Wait until a socket is up or every socket has tried once, so a call
+    /// made as the server starts sees the editor that is already running,
+    /// while one made with no editor does not wait for nothing.
+    pub async fn wait_first_attempt(&self, within: Duration) -> bool {
+        let deadline = tokio::time::Instant::now() + within;
+        loop {
+            let notified = self.changed.notified();
+            if self.is_connected() || self.tried.load(Ordering::Acquire) >= self.conns.len() {
+                return self.is_connected();
             }
             if tokio::time::timeout_at(deadline, notified).await.is_err() {
                 return self.is_connected();
@@ -294,10 +313,15 @@ impl Bridge {
         // Stagger the pool so a cold start does not hit the editor with N handshakes at once.
         tokio::time::sleep(Duration::from_millis(40 * conn.index as u64)).await;
         let mut backoff = Duration::from_millis(250);
+        let mut first = true;
         loop {
             match self.connect_once(&conn).await {
                 Ok(()) => backoff = Duration::from_millis(250),
                 Err(e) => debug!(conn = conn.index, "bridge connect failed: {e}"),
+            }
+            if std::mem::take(&mut first) {
+                self.tried.fetch_add(1, Ordering::AcqRel);
+                self.changed.notify_waiters();
             }
             tokio::time::sleep(backoff).await;
             backoff = (backoff * 2).min(Duration::from_secs(2));

@@ -575,6 +575,28 @@ async fn sends_the_editors_session_token() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+// A session's first call is often get_status. It must see the editor that is
+// already running, and must not stall when there is none.
+#[tokio::test(flavor = "multi_thread")]
+async fn status_as_the_first_call_sees_the_running_editor() {
+    let fake = FakeBridge::start(0).await;
+    let mut hub = StdioHub::start(fake.port).await;
+    let (_, text) = hub.call("project", "get_status", json!({})).await;
+    let v: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(v["editor"]["connected"], true, "{text}");
+    assert!(v["editor"]["engineVersion"].as_str().is_some_and(|e| e.starts_with("5.5")), "{text}");
+    fake.stop();
+
+    // Only the first attempt is waited for (Windows takes ~2 s to refuse a
+    // localhost connect), so later calls answer at once.
+    let mut alone = StdioHub::start(1).await;
+    let (_, text) = alone.call("project", "get_status", json!({})).await;
+    assert!(text.contains("\"connected\":false"), "{text}");
+    let started = std::time::Instant::now();
+    alone.call("project", "get_status", json!({})).await;
+    assert!(started.elapsed() < Duration::from_millis(500), "get_status waited {:?} with no editor", started.elapsed());
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn actions_the_editor_lacks_are_refused_without_a_round_trip() {
     let fake = FakeBridge::start(0).await;
