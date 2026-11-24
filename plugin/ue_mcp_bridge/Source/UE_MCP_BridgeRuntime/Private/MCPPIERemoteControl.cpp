@@ -55,11 +55,11 @@ void UMCPPIERemoteControl::BeginPlay()
 	if (GetOwnerRole() == ROLE_AutonomousProxy)
 	{
 		TapeFinishedHandle = MCPPIE::FPIEInputInjector::OnTapeFinished().AddUObject(this, &UMCPPIERemoteControl::HandleTapeFinished);
-		// The server adds this component at PostLogin, after the controller has been sent, so it
-		// usually reaches a client whose controller has begun play. The engine then runs this
-		// BeginPlay while creating the component, before registering its NetGUID, and an RPC sent
-		// now reaches the server as an unknown sub-object, which closes the connection. The NetGUID
-		// is registered before the next tick.
+		// The server adds this component at PostLogin, after PostLogin's client RPCs have sent the
+		// controller, so it can reach a client whose controller has already begun play. The engine
+		// then runs this BeginPlay while creating the component, before registering its NetGUID,
+		// and an RPC sent now reaches the server as an unknown sub-object, which closes the
+		// connection. The NetGUID is registered before the next tick.
 		if (UWorld* World = GetWorld())
 		{
 			World->GetTimerManager().SetTimerForNextTick(this, &UMCPPIERemoteControl::AnnounceReady);
